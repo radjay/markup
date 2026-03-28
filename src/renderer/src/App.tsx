@@ -104,7 +104,6 @@ export default function App() {
             <path d="M155 30L185 63H165V98H145V63H125L155 30Z" fill="currentColor"/>
             <path d="M30 98V30H50L70 55L90 30H110V98H90V59L70 84L50 59V98H30Z" fill="currentColor"/>
           </svg>
-          <h1>Markup</h1>
           <p>Review AI-generated plans and documents with inline comments.</p>
           <button onClick={handleOpen} className="open-button">
             Open Markdown File
