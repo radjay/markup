@@ -1,13 +1,18 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
-import { join } from 'path'
-import { readFile, writeFile } from 'fs/promises'
+import { join, extname, basename } from 'path'
+import { readFile, writeFile, readdir, stat } from 'fs/promises'
+import { watch, type FSWatcher } from 'fs'
 import { is } from '@electron-toolkit/utils'
 import { IPC } from '../shared/ipc-channels'
+import type { FileEntry } from '../shared/types'
+
+let mainWindow: BrowserWindow | null = null
+const watchers: Map<string, FSWatcher> = new Map()
 
 function createWindow(): BrowserWindow {
   const iconPath = join(__dirname, '../../assets/app-icon.png')
 
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     titleBarStyle: 'hiddenInset',
@@ -29,7 +34,111 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-// IPC Handlers
+// ---- Gitignore parsing ----
+
+async function loadGitignorePatterns(rootDir: string): Promise<((path: string, isDir: boolean) => boolean)> {
+  const patterns: { negated: boolean; regex: RegExp; dirOnly: boolean }[] = []
+
+  // Always ignore these
+  const builtinIgnores = ['node_modules', '.git', 'out', 'dist']
+  for (const name of builtinIgnores) {
+    patterns.push({ negated: false, regex: new RegExp(`(^|/)${name}(/|$)`), dirOnly: false })
+  }
+
+  try {
+    const content = await readFile(join(rootDir, '.gitignore'), 'utf-8')
+    for (let line of content.split('\n')) {
+      line = line.trim()
+      if (!line || line.startsWith('#')) continue
+
+      let negated = false
+      if (line.startsWith('!')) {
+        negated = true
+        line = line.slice(1)
+      }
+
+      const dirOnly = line.endsWith('/')
+      if (dirOnly) line = line.slice(0, -1)
+
+      // Convert gitignore glob to regex
+      let pattern = line
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex chars except * and ?
+        .replace(/\*\*/g, '{{GLOBSTAR}}')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\?/g, '[^/]')
+        .replace(/\{\{GLOBSTAR\}\}/g, '.*')
+
+      // If pattern doesn't contain /, match against basename
+      if (!line.includes('/')) {
+        pattern = `(^|/)${pattern}(/|$)`
+      } else {
+        pattern = `(^|/)${pattern}(/|$)`
+      }
+
+      patterns.push({ negated, regex: new RegExp(pattern), dirOnly })
+    }
+  } catch {
+    // No .gitignore — that's fine
+  }
+
+  return (relativePath: string, isDir: boolean) => {
+    let ignored = false
+    for (const p of patterns) {
+      if (p.dirOnly && !isDir) continue
+      if (p.regex.test(relativePath)) {
+        ignored = !p.negated
+      }
+    }
+    return ignored
+  }
+}
+
+// ---- Directory listing ----
+
+async function listMarkdownFiles(
+  dirPath: string,
+  depth = 0,
+  isIgnored?: (path: string, isDir: boolean) => boolean,
+  rootDir?: string
+): Promise<FileEntry[]> {
+  if (depth > 5) return []
+
+  if (!rootDir) rootDir = dirPath
+  if (!isIgnored) isIgnored = await loadGitignorePatterns(rootDir)
+
+  const entries = await readdir(dirPath, { withFileTypes: true })
+  const results: FileEntry[] = []
+
+  const sorted = entries
+    .filter((e) => !e.name.startsWith('.'))
+    .sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+
+  for (const entry of sorted) {
+    const fullPath = join(dirPath, entry.name)
+    const relativePath = fullPath.slice(rootDir.length)
+
+    if (isIgnored(relativePath, entry.isDirectory())) continue
+
+    if (entry.isDirectory()) {
+      const children = await listMarkdownFiles(fullPath, depth + 1, isIgnored, rootDir)
+      if (children.length > 0) {
+        results.push({ name: entry.name, path: fullPath, isDirectory: true, children })
+      }
+    } else {
+      const ext = extname(entry.name).toLowerCase()
+      if (ext === '.md' || ext === '.markdown') {
+        results.push({ name: entry.name, path: fullPath, isDirectory: false })
+      }
+    }
+  }
+
+  return results
+}
+
+// ---- IPC Handlers ----
 
 ipcMain.handle(IPC.OPEN_FILE, async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -44,16 +153,23 @@ ipcMain.handle(IPC.OPEN_FILE, async () => {
   return { filePath, content }
 })
 
+ipcMain.handle(IPC.OPEN_DIRECTORY, async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+
+  if (canceled || filePaths.length === 0) return null
+  return filePaths[0]
+})
+
 ipcMain.handle(IPC.READ_FILE, async (_event, filePath: string) => {
   const content = await readFile(filePath, 'utf-8')
   return { filePath, content }
 })
 
 ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) => {
-  console.log('[Main] Save requested:', filePath, 'content length:', content?.length)
   try {
     await writeFile(filePath, content, 'utf-8')
-    console.log('[Main] Save succeeded:', filePath)
     return { filePath, success: true }
   } catch (err) {
     console.error('[Main] Save failed:', err)
@@ -61,10 +177,45 @@ ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) 
   }
 })
 
-// App lifecycle
+ipcMain.handle(IPC.LIST_DIRECTORY, async (_event, dirPath: string) => {
+  try {
+    return await listMarkdownFiles(dirPath)
+  } catch (err) {
+    console.error('[Main] List directory failed:', err)
+    return []
+  }
+})
+
+ipcMain.handle(IPC.WATCH_FILE, async (_event, filePath: string) => {
+  // Clean up existing watcher for this file
+  const existing = watchers.get(filePath)
+  if (existing) existing.close()
+
+  try {
+    const watcher = watch(filePath, (eventType) => {
+      if (eventType === 'change' && mainWindow) {
+        mainWindow.webContents.send(IPC.FILE_CHANGED, filePath)
+      }
+    })
+    watchers.set(filePath, watcher)
+    return true
+  } catch {
+    return false
+  }
+})
+
+ipcMain.handle(IPC.UNWATCH_FILE, async (_event, filePath: string) => {
+  const watcher = watchers.get(filePath)
+  if (watcher) {
+    watcher.close()
+    watchers.delete(filePath)
+  }
+  return true
+})
+
+// ---- App lifecycle ----
 
 app.whenReady().then(() => {
-  // Set dock icon on macOS
   if (process.platform === 'darwin') {
     const dockIcon = nativeImage.createFromPath(join(__dirname, '../../assets/app-icon.png'))
     app.dock.setIcon(dockIcon)
@@ -80,6 +231,10 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  // Clean up all watchers
+  for (const w of watchers.values()) w.close()
+  watchers.clear()
+
   if (process.platform !== 'darwin') {
     app.quit()
   }
