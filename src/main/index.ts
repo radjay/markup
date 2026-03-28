@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron'
 import { join, extname, basename } from 'path'
 import { readFile, writeFile, readdir, stat } from 'fs/promises'
 import { watch, type FSWatcher } from 'fs'
@@ -213,6 +213,109 @@ ipcMain.handle(IPC.UNWATCH_FILE, async (_event, filePath: string) => {
   return true
 })
 
+// ---- Native Menus ----
+
+function buildMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Open File…',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => mainWindow?.webContents.send('menu:openFile')
+        },
+        {
+          label: 'Open Folder…',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow?.webContents.send('menu:openDirectory')
+        },
+        { type: 'separator' },
+        {
+          label: 'Save',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => mainWindow?.webContents.send('menu:save')
+        },
+        { type: 'separator' },
+        { role: 'close' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Edit Mode',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => mainWindow?.webContents.send('menu:toggleMode')
+        },
+        { type: 'separator' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        { role: 'front' }
+      ]
+    }
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+// ---- Drag and drop IPC ----
+
+ipcMain.handle('drop:file', async (_event, filePath: string) => {
+  const ext = extname(filePath).toLowerCase()
+  if (ext === '.md' || ext === '.markdown') {
+    const content = await readFile(filePath, 'utf-8')
+    return { type: 'file' as const, filePath, content }
+  }
+  // Check if it's a directory
+  try {
+    const stats = await stat(filePath)
+    if (stats.isDirectory()) {
+      return { type: 'directory' as const, dirPath: filePath }
+    }
+  } catch { /* ignore */ }
+  return null
+})
+
 // ---- App lifecycle ----
 
 app.whenReady().then(() => {
@@ -221,6 +324,7 @@ app.whenReady().then(() => {
     app.dock.setIcon(dockIcon)
   }
 
+  buildMenu()
   createWindow()
 
   app.on('activate', () => {
@@ -231,7 +335,6 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  // Clean up all watchers
   for (const w of watchers.values()) w.close()
   watchers.clear()
 

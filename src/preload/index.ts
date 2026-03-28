@@ -18,7 +18,29 @@ const api = {
     const handler = (_event: unknown, filePath: string) => callback(filePath)
     ipcRenderer.on(IPC.FILE_CHANGED, handler)
     return () => ipcRenderer.removeListener(IPC.FILE_CHANGED, handler)
-  }
+  },
+
+  // Menu events from native menu bar
+  onMenuOpenFile: (callback: () => void) => {
+    ipcRenderer.on('menu:openFile', callback)
+    return () => ipcRenderer.removeListener('menu:openFile', callback)
+  },
+  onMenuOpenDirectory: (callback: () => void) => {
+    ipcRenderer.on('menu:openDirectory', callback)
+    return () => ipcRenderer.removeListener('menu:openDirectory', callback)
+  },
+  onMenuSave: (callback: () => void) => {
+    ipcRenderer.on('menu:save', callback)
+    return () => ipcRenderer.removeListener('menu:save', callback)
+  },
+  onMenuToggleMode: (callback: () => void) => {
+    ipcRenderer.on('menu:toggleMode', callback)
+    return () => ipcRenderer.removeListener('menu:toggleMode', callback)
+  },
+
+  // Drag and drop
+  handleDrop: (filePath: string): Promise<{ type: 'file'; filePath: string; content: string } | { type: 'directory'; dirPath: string } | null> =>
+    ipcRenderer.invoke('drop:file', filePath)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

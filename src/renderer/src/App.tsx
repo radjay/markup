@@ -194,25 +194,53 @@ export default function App() {
     return cleanup
   }, [filePath])
 
-  // Keyboard shortcuts
+  // Native menu events
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        handleSave()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-        e.preventDefault()
-        handleOpen()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
-        e.preventDefault()
-        handleModeToggle()
+    const cleanups = [
+      window.electronAPI.onMenuOpenFile(() => handleOpen()),
+      window.electronAPI.onMenuOpenDirectory(() => handleOpenDirectory()),
+      window.electronAPI.onMenuSave(() => handleSave()),
+      window.electronAPI.onMenuToggleMode(() => handleModeToggle())
+    ]
+    return () => cleanups.forEach((c) => c())
+  }, [handleOpen, handleOpenDirectory, handleSave, handleModeToggle])
+
+  // Drag and drop
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const files = e.dataTransfer?.files
+      if (!files || files.length === 0) return
+
+      const droppedPath = (files[0] as unknown as { path: string }).path
+      if (!droppedPath) return
+
+      const result = await window.electronAPI.handleDrop(droppedPath)
+      if (!result) return
+
+      if (result.type === 'file') {
+        loadFile(result.filePath, result.content)
+      } else if (result.type === 'directory') {
+        setDirectoryPath(result.dirPath)
+        const dirFiles = await window.electronAPI.listDirectory(result.dirPath)
+        setDirectoryFiles(dirFiles)
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [handleSave, handleOpen, handleModeToggle])
+
+    document.addEventListener('dragover', handleDragOver)
+    document.addEventListener('drop', handleDrop)
+    return () => {
+      document.removeEventListener('dragover', handleDragOver)
+      document.removeEventListener('drop', handleDrop)
+    }
+  }, [loadFile])
 
   if (!filePath && !directoryPath) {
     return (
