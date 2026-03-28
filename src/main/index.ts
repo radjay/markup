@@ -1,14 +1,17 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
-import { readFile, writeFile, rename } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { is } from '@electron-toolkit/utils'
 import { IPC } from '../shared/ipc-channels'
 
 function createWindow(): BrowserWindow {
+  const iconPath = join(__dirname, '../../assets/app-icon.png')
+
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     titleBarStyle: 'hiddenInset',
+    icon: nativeImage.createFromPath(iconPath),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -61,6 +64,12 @@ ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) 
 // App lifecycle
 
 app.whenReady().then(() => {
+  // Set dock icon on macOS
+  if (process.platform === 'darwin') {
+    const dockIcon = nativeImage.createFromPath(join(__dirname, '../../assets/app-icon.png'))
+    app.dock.setIcon(dockIcon)
+  }
+
   createWindow()
 
   app.on('activate', () => {

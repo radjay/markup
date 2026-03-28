@@ -55,6 +55,11 @@ html, body, #root {
   -webkit-app-region: no-drag;
 }
 
+.welcome-icon {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
 .welcome h1 {
   font-size: 48px;
   font-weight: 700;
