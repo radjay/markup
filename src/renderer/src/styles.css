@@ -148,6 +148,16 @@ html, body, #root {
   border-color: var(--accent);
 }
 
+.open-button-secondary {
+  background: transparent;
+}
+
+.welcome-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
 .shortcut-hint {
   margin-top: 16px;
   color: var(--text-muted);
@@ -679,4 +689,225 @@ kbd {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* ---- Mode Toggle ---- */
+
+.mode-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mode-button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-button.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.mode-button:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+/* ---- External Change Bar ---- */
+
+.external-change-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  padding-left: 80px;
+  background: rgba(99, 102, 241, 0.08);
+  border-bottom: 1px solid var(--comment-border);
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.external-change-bar button {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.external-change-bar button:first-of-type {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- Sidebar ---- */
+
+.sidebar {
+  width: 240px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar-section + .sidebar-section {
+  border-top: 1px solid var(--border);
+  flex: 0 0 auto;
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+}
+
+.sidebar-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 12px 12px 8px;
+}
+
+.sidebar-header .sidebar-section-title {
+  padding: 0;
+}
+
+.sidebar-action {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.sidebar-action:hover {
+  color: var(--text);
+}
+
+.sidebar-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+}
+
+/* ---- File Tree ---- */
+
+.file-tree {
+  padding-bottom: 8px;
+}
+
+.file-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 0;
+  transition: background 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-node-row:hover {
+  background: var(--bg-hover);
+}
+
+.file-node-row.active {
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+
+.file-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.directory .file-name {
+  font-weight: 500;
+}
+
+/* ---- Outline ---- */
+
+.outline {
+  padding-bottom: 8px;
+}
+
+.outline-list {
+  padding: 0 4px;
+}
+
+.outline-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 3px 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s;
+}
+
+.outline-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.outline-level-1 { padding-left: 12px; font-weight: 500; }
+.outline-level-2 { padding-left: 24px; }
+.outline-level-3 { padding-left: 36px; font-size: 11px; }
+
+.editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ---- Edit Mode ---- */
+
+.edit-mode {
+  height: 100%;
+}
+
+.edit-mode .cm-editor {
+  height: 100%;
 }

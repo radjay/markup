@@ -37,3 +37,16 @@ export interface ParsedDocument {
   documentComments: DocumentComment[]
   reviewMetadata: Partial<ReviewMetadata> | null
 }
+
+export interface FileEntry {
+  name: string
+  path: string
+  isDirectory: boolean
+  children?: FileEntry[]
+}
+
+export interface HeadingEntry {
+  level: number
+  text: string
+  id: string
+}
