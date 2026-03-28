@@ -47,10 +47,15 @@ ipcMain.handle(IPC.READ_FILE, async (_event, filePath: string) => {
 })
 
 ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) => {
-  const tmpPath = filePath + '.tmp'
-  await writeFile(tmpPath, content, 'utf-8')
-  await rename(tmpPath, filePath)
-  return { filePath }
+  console.log('[Main] Save requested:', filePath, 'content length:', content?.length)
+  try {
+    await writeFile(filePath, content, 'utf-8')
+    console.log('[Main] Save succeeded:', filePath)
+    return { filePath, success: true }
+  } catch (err) {
+    console.error('[Main] Save failed:', err)
+    return { filePath, success: false, error: String(err) }
+  }
 })
 
 // App lifecycle

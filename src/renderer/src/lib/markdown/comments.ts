@@ -1,5 +1,4 @@
 import type { InlineComment, DocumentComment, ParsedDocument } from '../../../../shared/types'
-import matter from 'gray-matter'
 import { nanoid } from 'nanoid'
 
 const INLINE_COMMENT_RE =
@@ -8,8 +7,48 @@ const INLINE_COMMENT_RE =
 const DOC_COMMENTS_RE =
   /<!--\s*@markup-doc-comments\s*\n([\s\S]*?)\n\s*-->/g
 
+// Simple frontmatter parser (no Buffer dependency like gray-matter)
+function parseFrontmatter(raw: string): { data: Record<string, unknown>; body: string } {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/)
+  if (!match) return { data: {}, body: raw }
+
+  const yamlStr = match[1]
+  const body = raw.slice(match[0].length)
+  const data: Record<string, unknown> = {}
+
+  // Parse simple YAML key: value pairs
+  for (const line of yamlStr.split('\n')) {
+    const kv = line.match(/^(\w[\w_]*)\s*:\s*(.*)$/)
+    if (kv) {
+      let val: unknown = kv[2].trim()
+      // Remove surrounding quotes
+      if ((val as string).startsWith('"') && (val as string).endsWith('"')) {
+        val = (val as string).slice(1, -1)
+      }
+      if (val === 'true') val = true
+      else if (val === 'false') val = false
+      data[kv[1]] = val
+    }
+  }
+
+  return { data, body }
+}
+
+function stringifyFrontmatter(data: Record<string, unknown>, body: string): string {
+  const keys = Object.keys(data)
+  if (keys.length === 0) return body
+
+  const lines = keys.map((k) => {
+    const v = data[k]
+    if (typeof v === 'string') return `${k}: "${v}"`
+    return `${k}: ${v}`
+  })
+
+  return `---\n${lines.join('\n')}\n---\n${body}`
+}
+
 export function parseComments(raw: string): ParsedDocument {
-  const { data: frontmatter, content: bodyWithComments } = matter(raw)
+  const { data: frontmatter, body: bodyWithComments } = parseFrontmatter(raw)
 
   const inlineComments: InlineComment[] = []
   const documentComments: DocumentComment[] = []
@@ -25,7 +64,7 @@ export function parseComments(raw: string): ParsedDocument {
         type: 'inline',
         anchor: meta.anchor || '',
         selection: meta.selection,
-        author: meta.author || 'unknown',
+        author: meta.author || '',
         ts: meta.ts || new Date().toISOString(),
         body: match[2].trim()
       })
@@ -46,7 +85,7 @@ export function parseComments(raw: string): ParsedDocument {
         documentComments.push({
           id: parsed.id || nanoid(),
           type: 'document',
-          author: parsed.author || 'unknown',
+          author: parsed.author || '',
           ts: parsed.ts || new Date().toISOString(),
           body: parsed.body || ''
         })
@@ -58,17 +97,17 @@ export function parseComments(raw: string): ParsedDocument {
 
   // Strip comments from content for clean rendering
   const content = bodyWithComments
-    .replace(inlineRe, '')
+    .replace(new RegExp(INLINE_COMMENT_RE.source, 'g'), '')
     .replace(new RegExp(DOC_COMMENTS_RE.source, 'g'), '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
   const reviewMetadata = frontmatter.markup_reviewed
     ? {
-        markup_reviewed: frontmatter.markup_reviewed,
-        markup_reviewer: frontmatter.markup_reviewer,
-        markup_reviewed_at: frontmatter.markup_reviewed_at,
-        markup_status: frontmatter.markup_status
+        markup_reviewed: frontmatter.markup_reviewed as boolean,
+        markup_reviewer: frontmatter.markup_reviewer as string,
+        markup_reviewed_at: frontmatter.markup_reviewed_at as string,
+        markup_status: frontmatter.markup_status as 'approved' | 'changes_requested' | 'commented'
       }
     : null
 
@@ -78,51 +117,53 @@ export function parseComments(raw: string): ParsedDocument {
 export function serializeComments(
   originalRaw: string,
   inlineComments: InlineComment[],
-  documentComments: DocumentComment[],
-  reviewer: string
+  documentComments: DocumentComment[]
 ): string {
-  // Parse frontmatter from original
-  const { data: frontmatter, content: body } = matter(originalRaw)
+  const { data: frontmatter, body } = parseFrontmatter(originalRaw)
 
   // Strip any existing @markup comments from body
-  const inlineRe = new RegExp(INLINE_COMMENT_RE.source, 'g')
-  const docRe = new RegExp(DOC_COMMENTS_RE.source, 'g')
-  let cleanBody = body.replace(inlineRe, '').replace(docRe, '').replace(/\n{3,}/g, '\n\n').trim()
+  let cleanBody = body
+    .replace(new RegExp(INLINE_COMMENT_RE.source, 'g'), '')
+    .replace(new RegExp(DOC_COMMENTS_RE.source, 'g'), '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 
-  // Insert inline comments after their anchor headings
+  // Insert inline comments after lines that match their anchor content
   if (inlineComments.length > 0) {
     const lines = cleanBody.split('\n')
     const insertions: Map<number, string[]> = new Map()
 
     for (const comment of inlineComments) {
-      // Find the heading line that matches the anchor
+      const anchorText = comment.anchor.replace(/^(h[1-6]|p|blockquote|ul|ol|table|code):/, '')
       let bestLine = -1
+
       for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim()
-        if (trimmed === comment.anchor) {
+          .replace(/^#{1,6}\s+/, '')
+          .replace(/^\*\*/, '').replace(/\*\*$/, '')
+          .replace(/^>\s*/, '')
+
+        if (anchorText && trimmed.startsWith(anchorText.slice(0, 40))) {
           bestLine = i
+          break
         }
       }
 
       if (bestLine === -1) {
-        // No matching heading — find the next blank line after start or append at end
         bestLine = lines.length - 1
       }
 
-      // Find the end of the section (next heading or end of content under this heading)
-      let insertAt = bestLine + 1
-      while (insertAt < lines.length && !lines[insertAt].trim().startsWith('#')) {
-        insertAt++
-      }
-      // Back up to just before the next heading
-      insertAt = Math.max(bestLine + 1, insertAt - 1)
-
-      // Find last non-empty line in the section
-      let lastContent = insertAt
-      for (let j = insertAt; j > bestLine; j--) {
-        if (lines[j] && lines[j].trim() !== '') {
-          lastContent = j
-          break
+      // Find end of this block
+      let insertAt = bestLine
+      if (comment.anchor.startsWith('h')) {
+        insertAt = bestLine
+      } else {
+        for (let j = bestLine + 1; j < lines.length; j++) {
+          if (lines[j].trim() === '' || lines[j].trim().startsWith('#')) {
+            insertAt = j - 1
+            break
+          }
+          insertAt = j
         }
       }
 
@@ -136,15 +177,13 @@ export function serializeComments(
       if (comment.selection) meta.selection = comment.selection
 
       const commentStr = `<!-- @markup ${JSON.stringify(meta)} ${comment.body} -->`
-
-      const existing = insertions.get(lastContent) || []
+      const existing = insertions.get(insertAt) || []
       existing.push(commentStr)
-      insertions.set(lastContent, existing)
+      insertions.set(insertAt, existing)
     }
 
-    // Insert comments from bottom to top to preserve line numbers
-    const sortedInsertions = Array.from(insertions.entries()).sort((a, b) => b[0] - a[0])
-    for (const [lineIdx, comments] of sortedInsertions) {
+    const sorted = Array.from(insertions.entries()).sort((a, b) => b[0] - a[0])
+    for (const [lineIdx, comments] of sorted) {
       lines.splice(lineIdx + 1, 0, ...comments)
     }
 
@@ -163,13 +202,12 @@ export function serializeComments(
   const hasComments = inlineComments.length > 0 || documentComments.length > 0
   if (hasComments) {
     frontmatter.markup_reviewed = true
-    frontmatter.markup_reviewer = reviewer
     frontmatter.markup_reviewed_at = new Date().toISOString()
     frontmatter.markup_status =
       inlineComments.length > 0 ? 'changes_requested' : 'commented'
   }
 
-  return matter.stringify(cleanBody, frontmatter)
+  return stringifyFrontmatter(frontmatter, cleanBody)
 }
 
 export function createInlineComment(anchor: string, body: string, author: string): InlineComment {

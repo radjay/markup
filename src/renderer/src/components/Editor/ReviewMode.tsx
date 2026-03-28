@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -12,10 +12,26 @@ interface Props {
   onDeleteComment: (id: string) => void
 }
 
+function blockAnchor(tag: string, children: ReactNode): string {
+  const text = extractText(children).slice(0, 80).trim()
+  return `${tag}:${text}`
+}
+
+function extractText(children: ReactNode): string {
+  if (typeof children === 'string') return children
+  if (typeof children === 'number') return String(children)
+  if (Array.isArray(children)) return children.map(extractText).join('')
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractText((children as { props: { children: ReactNode } }).props.children)
+  }
+  return ''
+}
+
 export function ReviewMode({ content, inlineComments, onAddComment, onDeleteComment }: Props) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null)
 
-  const handleHeadingClick = useCallback((anchor: string) => {
+  const handleBlockClick = useCallback((anchor: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     setActiveAnchor((prev) => (prev === anchor ? null : anchor))
   }, [])
 
@@ -23,107 +39,81 @@ export function ReviewMode({ content, inlineComments, onAddComment, onDeleteComm
     (body: string) => {
       if (activeAnchor) {
         onAddComment(activeAnchor, body)
-        setActiveAnchor(null)
+        // Keep the panel open so user can see their comment was added
       }
     },
     [activeAnchor, onAddComment]
   )
 
-  const getCommentsForAnchor = (anchor: string) =>
-    inlineComments.filter((c) => c.anchor === anchor)
+  const getCommentsForAnchor = useCallback(
+    (anchor: string) => inlineComments.filter((c) => c.anchor === anchor),
+    [inlineComments]
+  )
+
+  // Render a commentable wrapper around a block element
+  const renderBlock = (anchor: string, children: ReactNode) => {
+    const comments = getCommentsForAnchor(anchor)
+    const isActive = activeAnchor === anchor
+    const hasComments = comments.length > 0
+
+    return (
+      <div
+        className={`commentable-block ${isActive ? 'active' : ''} ${hasComments ? 'has-comments' : ''}`}
+        onClick={(e) => handleBlockClick(anchor, e)}
+      >
+        {children}
+        {hasComments && !isActive && (
+          <span className="comment-badge">{comments.length}</span>
+        )}
+        {isActive && (
+          <InlineComment
+            anchor={anchor}
+            comments={comments}
+            onSubmit={handleSubmitComment}
+            onClose={() => setActiveAnchor(null)}
+            onDelete={onDeleteComment}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div className="review-mode">
+    <div className="review-mode" onClick={() => setActiveAnchor(null)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
         components={{
-          h1: ({ children, ...props }) => {
-            const anchor = `# ${extractText(children)}`
-            const comments = getCommentsForAnchor(anchor)
-            return (
-              <div className="heading-wrapper">
-                <h1
-                  {...props}
-                  className={`commentable ${activeAnchor === anchor ? 'active' : ''}`}
-                  onClick={() => handleHeadingClick(anchor)}
-                >
-                  {children}
-                  {comments.length > 0 && (
-                    <span className="comment-badge">{comments.length}</span>
-                  )}
-                </h1>
-                {activeAnchor === anchor && (
-                  <InlineComment
-                    anchor={anchor}
-                    comments={comments}
-                    onSubmit={handleSubmitComment}
-                    onClose={() => setActiveAnchor(null)}
-                    onDelete={onDeleteComment}
-                  />
-                )}
+          h1: ({ children, ...props }) =>
+            renderBlock(blockAnchor('h1', children), <h1 {...props}>{children}</h1>),
+          h2: ({ children, ...props }) =>
+            renderBlock(blockAnchor('h2', children), <h2 {...props}>{children}</h2>),
+          h3: ({ children, ...props }) =>
+            renderBlock(blockAnchor('h3', children), <h3 {...props}>{children}</h3>),
+          p: ({ children, ...props }) =>
+            renderBlock(blockAnchor('p', children), <p {...props}>{children}</p>),
+          blockquote: ({ children, ...props }) =>
+            renderBlock(
+              blockAnchor('blockquote', children),
+              <blockquote {...props}>{children}</blockquote>
+            ),
+          ul: ({ children, ...props }) =>
+            renderBlock(blockAnchor('ul', children), <ul {...props}>{children}</ul>),
+          ol: ({ children, ...props }) =>
+            renderBlock(blockAnchor('ol', children), <ol {...props}>{children}</ol>),
+          table: ({ children, ...props }) =>
+            renderBlock(
+              blockAnchor('table', children),
+              <div className="table-wrapper">
+                <table {...props}>{children}</table>
               </div>
-            )
-          },
-          h2: ({ children, ...props }) => {
-            const anchor = `## ${extractText(children)}`
-            const comments = getCommentsForAnchor(anchor)
-            return (
-              <div className="heading-wrapper">
-                <h2
-                  {...props}
-                  className={`commentable ${activeAnchor === anchor ? 'active' : ''}`}
-                  onClick={() => handleHeadingClick(anchor)}
-                >
-                  {children}
-                  {comments.length > 0 && (
-                    <span className="comment-badge">{comments.length}</span>
-                  )}
-                </h2>
-                {activeAnchor === anchor && (
-                  <InlineComment
-                    anchor={anchor}
-                    comments={comments}
-                    onSubmit={handleSubmitComment}
-                    onClose={() => setActiveAnchor(null)}
-                    onDelete={onDeleteComment}
-                  />
-                )}
-              </div>
-            )
-          },
-          h3: ({ children, ...props }) => {
-            const anchor = `### ${extractText(children)}`
-            const comments = getCommentsForAnchor(anchor)
-            return (
-              <div className="heading-wrapper">
-                <h3
-                  {...props}
-                  className={`commentable ${activeAnchor === anchor ? 'active' : ''}`}
-                  onClick={() => handleHeadingClick(anchor)}
-                >
-                  {children}
-                  {comments.length > 0 && (
-                    <span className="comment-badge">{comments.length}</span>
-                  )}
-                </h3>
-                {activeAnchor === anchor && (
-                  <InlineComment
-                    anchor={anchor}
-                    comments={comments}
-                    onSubmit={handleSubmitComment}
-                    onClose={() => setActiveAnchor(null)}
-                    onDelete={onDeleteComment}
-                  />
-                )}
-              </div>
-            )
-          },
+            ),
           code: ({ className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '')
             const isBlock = match || (typeof children === 'string' && children.includes('\n'))
             if (isBlock) {
-              return (
+              return renderBlock(
+                blockAnchor('code', children),
                 <pre className={`code-block ${className || ''}`}>
                   <code {...props}>{children}</code>
                 </pre>
@@ -134,25 +124,11 @@ export function ReviewMode({ content, inlineComments, onAddComment, onDeleteComm
                 {children}
               </code>
             )
-          },
-          table: ({ children, ...props }) => (
-            <div className="table-wrapper">
-              <table {...props}>{children}</table>
-            </div>
-          )
+          }
         }}
       >
         {content}
       </ReactMarkdown>
     </div>
   )
-}
-
-function extractText(children: React.ReactNode): string {
-  if (typeof children === 'string') return children
-  if (Array.isArray(children)) return children.map(extractText).join('')
-  if (children && typeof children === 'object' && 'props' in children) {
-    return extractText((children as { props: { children: React.ReactNode } }).props.children)
-  }
-  return String(children ?? '')
 }

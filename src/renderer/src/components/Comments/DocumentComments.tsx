@@ -36,7 +36,6 @@ export function DocumentComments({ comments, onAdd, onDelete }: Props) {
         {comments.map((c) => (
           <div key={c.id} className="comment-item">
             <div className="comment-meta">
-              <span className="comment-author">{c.author}</span>
               <span className="comment-time">
                 {new Date(c.ts).toLocaleString()}
               </span>

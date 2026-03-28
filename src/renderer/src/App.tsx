@@ -18,10 +18,16 @@ export default function App() {
     setRawContent(content)
     setFileName(path.split('/').pop() || path)
 
-    const parsed = parseComments(content)
-    setCleanContent(parsed.content)
-    setInlineComments(parsed.inlineComments)
-    setDocumentComments(parsed.documentComments)
+    try {
+      const parsed = parseComments(content)
+      setCleanContent(parsed.content)
+      setInlineComments(parsed.inlineComments)
+      setDocumentComments(parsed.documentComments)
+    } catch (err) {
+      console.error('Failed to parse markdown:', err)
+      // Fallback: show raw content without comment parsing
+      setCleanContent(content)
+    }
     setHasUnsavedChanges(false)
   }, [])
 
@@ -35,16 +41,20 @@ export default function App() {
   const handleSave = useCallback(async () => {
     if (!filePath) return
 
-    const serialized = serializeComments(
-      rawContent,
-      inlineComments,
-      documentComments,
-      'reviewer'
-    )
-
-    await window.electronAPI.saveFile(filePath, serialized)
-    setRawContent(serialized)
-    setHasUnsavedChanges(false)
+    try {
+      const serialized = serializeComments(
+        rawContent,
+        inlineComments,
+        documentComments
+      )
+      console.log('[Markup] Saving to:', filePath, 'length:', serialized.length)
+      const result = await window.electronAPI.saveFile(filePath, serialized)
+      console.log('[Markup] Save result:', result)
+      setRawContent(serialized)
+      setHasUnsavedChanges(false)
+    } catch (err) {
+      console.error('[Markup] Save failed:', err)
+    }
   }, [filePath, rawContent, inlineComments, documentComments])
 
   const handleAddInlineComment = useCallback((anchor: string, body: string) => {
