@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { parseComments, serializeComments, createInlineComment, createDocumentComment } from './lib/markdown/comments'
 import { ReviewMode } from './components/Editor/ReviewMode'
 import { EditMode } from './components/Editor/EditMode'
@@ -22,7 +22,6 @@ export default function App() {
   const [directoryPath, setDirectoryPath] = useState<string | null>(null)
   const [directoryFiles, setDirectoryFiles] = useState<FileEntry[]>([])
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
-  const isSavingRef = useRef(false)
 
   // Extract headings from clean content for the outline
   const headings = useMemo<HeadingEntry[]>(() => {
@@ -111,10 +110,11 @@ export default function App() {
       // If in edit mode, use the edited content as the new raw content
       const baseContent = mode === 'edit' ? editContent : rawContent
       const serialized = serializeComments(baseContent, inlineComments, documentComments)
-      isSavingRef.current = true
+      // Unwatch before saving to prevent self-triggered "modified externally"
+      await window.electronAPI.unwatchFile(filePath)
       await window.electronAPI.saveFile(filePath, serialized)
-      // Suppress file watcher for our own save (debounce window)
-      setTimeout(() => { isSavingRef.current = false }, 1000)
+      // Re-watch after a delay to let fs events settle
+      setTimeout(() => { window.electronAPI.watchFile(filePath) }, 1500)
       setRawContent(serialized)
 
       // Re-parse to update clean content
@@ -191,7 +191,7 @@ export default function App() {
   // Listen for external file changes
   useEffect(() => {
     const cleanup = window.electronAPI.onFileChanged((changedPath: string) => {
-      if (changedPath === filePath && !isSavingRef.current) {
+      if (changedPath === filePath) {
         setShowExternalChangeBar(true)
       }
     })
