@@ -6,5 +6,12 @@ export const IPC = {
   LIST_DIRECTORY: 'file:listDirectory',
   WATCH_FILE: 'file:watch',
   UNWATCH_FILE: 'file:unwatch',
-  FILE_CHANGED: 'file:changed'
+  FILE_CHANGED: 'file:changed',
+  FILE_ADDED: 'file:added',
+  FILE_REMOVED: 'file:removed',
+  SETTINGS_LOAD: 'settings:load',
+  SETTINGS_SAVE: 'settings:save',
+  ADD_FOLDER: 'folder:add',
+  REMOVE_FOLDER: 'folder:remove',
+  LIST_RECENT_FILES: 'folder:listRecent'
 } as const

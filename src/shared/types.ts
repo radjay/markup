@@ -50,3 +50,17 @@ export interface HeadingEntry {
   text: string
   id: string
 }
+
+export interface WorkspaceSettings {
+  folders: string[]
+  sidebarMode: 'tree' | 'recent'
+}
+
+export interface WatchedFile {
+  path: string
+  name: string
+  folder: string
+  folderName: string
+  relativePath: string
+  mtime: number
+}

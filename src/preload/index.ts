@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
-import type { FileData, FileEntry } from '../shared/types'
+import type { FileData, FileEntry, WorkspaceSettings, WatchedFile } from '../shared/types'
 
 const api = {
   openFile: (): Promise<FileData | null> => ipcRenderer.invoke(IPC.OPEN_FILE),
@@ -14,20 +14,43 @@ const api = {
     ipcRenderer.invoke(IPC.WATCH_FILE, filePath),
   unwatchFile: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.UNWATCH_FILE, filePath),
+
+  // Settings
+  loadSettings: (): Promise<WorkspaceSettings> => ipcRenderer.invoke(IPC.SETTINGS_LOAD),
+  saveSettings: (settings: WorkspaceSettings): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.SETTINGS_SAVE, settings),
+
+  // Folder management
+  addFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.ADD_FOLDER),
+  removeFolder: (folder: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.REMOVE_FOLDER, folder),
+  listRecentFiles: (): Promise<WatchedFile[]> => ipcRenderer.invoke(IPC.LIST_RECENT_FILES),
+
+  // Events
   onFileChanged: (callback: (filePath: string) => void) => {
     const handler = (_event: unknown, filePath: string) => callback(filePath)
     ipcRenderer.on(IPC.FILE_CHANGED, handler)
     return () => ipcRenderer.removeListener(IPC.FILE_CHANGED, handler)
   },
+  onFileAdded: (callback: (filePath: string, folder: string) => void) => {
+    const handler = (_event: unknown, filePath: string, folder: string) => callback(filePath, folder)
+    ipcRenderer.on(IPC.FILE_ADDED, handler)
+    return () => ipcRenderer.removeListener(IPC.FILE_ADDED, handler)
+  },
+  onFileRemoved: (callback: (filePath: string, folder: string) => void) => {
+    const handler = (_event: unknown, filePath: string, folder: string) => callback(filePath, folder)
+    ipcRenderer.on(IPC.FILE_REMOVED, handler)
+    return () => ipcRenderer.removeListener(IPC.FILE_REMOVED, handler)
+  },
 
-  // Menu events from native menu bar
+  // Menu events
   onMenuOpenFile: (callback: () => void) => {
     ipcRenderer.on('menu:openFile', callback)
     return () => ipcRenderer.removeListener('menu:openFile', callback)
   },
-  onMenuOpenDirectory: (callback: () => void) => {
-    ipcRenderer.on('menu:openDirectory', callback)
-    return () => ipcRenderer.removeListener('menu:openDirectory', callback)
+  onMenuAddFolder: (callback: () => void) => {
+    ipcRenderer.on('menu:addFolder', callback)
+    return () => ipcRenderer.removeListener('menu:addFolder', callback)
   },
   onMenuSave: (callback: () => void) => {
     ipcRenderer.on('menu:save', callback)
