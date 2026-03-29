@@ -23,5 +23,36 @@ Electron-based native markdown editor for reviewing AI-generated plans and docum
 
 ## Development
 
-- `npm start` — run in development mode
+- `npm run dev` — run in development mode
 - `npm run build` — build for production
+- `npm run dist` — package as macOS DMG
+
+## Markup Comments
+
+When you encounter HTML comments in markdown files matching the pattern `<!-- @markup {...} ... -->`, these are review comments left by a human using the Markup editor. Your job is to address this feedback.
+
+### Inline comments
+Appear after the content they reference:
+```
+<!-- @markup {"id":"...","type":"inline","anchor":"h2:Architecture","author":"...","ts":"..."} The comment text here -->
+```
+
+The `anchor` field tells you which section the comment targets. The format is `tag:content` where tag is h1/h2/h3/p/table/code/etc.
+
+### Document-level comments
+Appear at the end of the file in a block:
+```
+<!-- @markup-doc-comments
+{"id":"...","type":"document","author":"...","ts":"...","body":"General feedback here"}
+-->
+```
+
+### How to handle them
+
+1. Parse each `@markup` comment to understand the feedback
+2. Address inline comments by updating the relevant section
+3. Address document-level comments by making the requested changes
+4. **Remove each `@markup` inline comment once you've addressed it**
+5. **Remove the `@markup-doc-comments` block once all document comments are addressed**
+6. Update `markup_status` in frontmatter to reflect the current state
+7. Preserve any frontmatter fields prefixed with `markup_`
