@@ -31,22 +31,23 @@ function folderDisplayName(folderPath: string): string {
 }
 
 export function startWatching(folders: string[]): void {
-  // Stop all existing watchers
   stopAllWatching()
 
   for (const folder of folders) {
-    const watcher = chokidar.watch(folder, {
+    // Watch only .md files using a glob — avoids opening file descriptors for every file
+    const watcher = chokidar.watch(join(folder, '**/*.md'), {
       ignored: [
-        /(^|[/\\])\./,          // dotfiles
+        /(^|[/\\])\./,
         /node_modules/,
         /\.git/,
-        /\bout\b/,
-        /\bdist\b/,
-        /\brelease\b/
+        /\bout\//,
+        /\bdist\//,
+        /\brelease\//
       ],
       persistent: true,
       ignoreInitial: true,
-      depth: 10
+      depth: 5,
+      usePolling: false
     })
 
     watcher.on('add', (filePath) => {
