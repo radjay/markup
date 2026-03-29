@@ -26,8 +26,9 @@ function isMd(filePath: string): boolean {
 }
 
 function folderDisplayName(folderPath: string): string {
-  const parts = folderPath.split('/')
-  return parts.slice(-2).join('/')
+  const parts = folderPath.split('/').filter(Boolean)
+  // Show last 3 segments for better context (e.g., "radjay/dev/markup")
+  return parts.slice(-3).join('/')
 }
 
 export function startWatching(folders: string[]): void {

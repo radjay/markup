@@ -1054,10 +1054,25 @@ kbd {
   flex-shrink: 0;
 }
 
+.recent-file-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .recent-file-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.recent-file-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: -1px;
 }
 
 .recent-file-time {

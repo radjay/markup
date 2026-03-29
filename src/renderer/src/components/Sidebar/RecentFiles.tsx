@@ -53,6 +53,11 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
             const isActive = file.path === currentFile
             const isNew = !viewedFiles.has(file.path)
 
+            // Show parent path without the filename
+            const parentPath = file.relativePath.includes('/')
+              ? file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
+              : ''
+
             return (
               <div
                 key={file.path}
@@ -62,7 +67,10 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
               >
                 <div className="recent-file-info">
                   {isNew && <span className="new-badge" />}
-                  <span className="recent-file-name">{file.name}</span>
+                  <div className="recent-file-details">
+                    <span className="recent-file-name">{file.name}</span>
+                    {parentPath && <span className="recent-file-path">{parentPath}</span>}
+                  </div>
                 </div>
                 <span className="recent-file-time">{relativeTime(file.mtime)}</span>
               </div>
