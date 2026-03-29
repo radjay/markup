@@ -213,20 +213,82 @@ kbd {
 
 .titlebar-center {
   flex: 1;
-  text-align: center;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
 }
 
-.filename {
-  font-size: 13px;
-  color: var(--text-secondary);
-  display: inline-flex;
+/* ---- Tab Bar ---- */
+
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  overflow-x: auto;
+  gap: 1px;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
   align-items: center;
   gap: 6px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tab.preview .tab-name {
+  font-style: italic;
+}
+
+.tab-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  color: var(--text);
 }
 
 .unsaved-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
   display: inline-block;

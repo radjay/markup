@@ -9,26 +9,75 @@ import type { InlineComment, DocumentComment, FileEntry, HeadingEntry } from '..
 
 type EditorMode = 'review' | 'edit'
 
+interface Tab {
+  filePath: string
+  fileName: string
+  rawContent: string
+  cleanContent: string
+  editContent: string
+  inlineComments: InlineComment[]
+  documentComments: DocumentComment[]
+  hasUnsavedChanges: boolean
+  mode: EditorMode
+  pinned: boolean // false = preview tab (italic, replaced on next open)
+}
+
+function parseFileIntoTab(filePath: string, content: string, pinned: boolean): Tab {
+  const fileName = filePath.split('/').pop() || filePath
+  let cleanContent = content
+  let inlineComments: InlineComment[] = []
+  let documentComments: DocumentComment[] = []
+
+  try {
+    const parsed = parseComments(content)
+    cleanContent = parsed.content
+    inlineComments = parsed.inlineComments
+    documentComments = parsed.documentComments
+  } catch (err) {
+    console.error('Failed to parse markdown:', err)
+  }
+
+  return {
+    filePath,
+    fileName,
+    rawContent: content,
+    cleanContent,
+    editContent: cleanContent,
+    inlineComments,
+    documentComments,
+    hasUnsavedChanges: false,
+    mode: 'review',
+    pinned
+  }
+}
+
 export default function App() {
-  const [filePath, setFilePath] = useState<string | null>(null)
-  const [rawContent, setRawContent] = useState<string>('')
-  const [cleanContent, setCleanContent] = useState<string>('')
-  const [editContent, setEditContent] = useState<string>('')
-  const [inlineComments, setInlineComments] = useState<InlineComment[]>([])
-  const [documentComments, setDocumentComments] = useState<DocumentComment[]>([])
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [fileName, setFileName] = useState<string>('')
-  const [mode, setMode] = useState<EditorMode>('review')
+  const [tabs, setTabs] = useState<Tab[]>([])
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(-1)
   const [directoryPath, setDirectoryPath] = useState<string | null>(null)
   const [directoryFiles, setDirectoryFiles] = useState<FileEntry[]>([])
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
 
-  // Extract headings from clean content for the outline
+  const activeTab = activeTabIndex >= 0 && activeTabIndex < tabs.length ? tabs[activeTabIndex] : null
+
+  // Update a specific tab's state
+  const updateTab = useCallback((index: number, updates: Partial<Tab>) => {
+    setTabs((prev) => prev.map((t, i) => (i === index ? { ...t, ...updates } : t)))
+  }, [])
+
+  // Update the active tab's state
+  const updateActiveTab = useCallback(
+    (updates: Partial<Tab>) => {
+      if (activeTabIndex >= 0) updateTab(activeTabIndex, updates)
+    },
+    [activeTabIndex, updateTab]
+  )
+
+  // Extract headings from active tab's content
   const headings = useMemo<HeadingEntry[]>(() => {
-    if (!cleanContent) return []
+    if (!activeTab?.cleanContent) return []
     const result: HeadingEntry[] = []
-    const lines = cleanContent.split('\n')
-    for (const line of lines) {
+    for (const line of activeTab.cleanContent.split('\n')) {
       const match = line.match(/^(#{1,3})\s+(.+)$/)
       if (match) {
         const text = match[2].trim()
@@ -40,47 +89,58 @@ export default function App() {
       }
     }
     return result
-  }, [cleanContent])
+  }, [activeTab?.cleanContent])
 
-  const loadFile = useCallback((path: string, content: string) => {
-    setFilePath(path)
-    setRawContent(content)
-    setFileName(path.split('/').pop() || path)
-    setShowExternalChangeBar(false)
+  // Open a file into a tab
+  const openFileInTab = useCallback(
+    (filePath: string, content: string, pinned: boolean) => {
+      // Check if already open
+      const existingIndex = tabs.findIndex((t) => t.filePath === filePath)
+      if (existingIndex >= 0) {
+        setActiveTabIndex(existingIndex)
+        if (pinned) updateTab(existingIndex, { pinned: true })
+        return
+      }
 
-    try {
-      const parsed = parseComments(content)
-      setCleanContent(parsed.content)
-      setEditContent(parsed.content)
-      setInlineComments(parsed.inlineComments)
-      setDocumentComments(parsed.documentComments)
-    } catch (err) {
-      console.error('Failed to parse markdown:', err)
-      setCleanContent(content)
-      setEditContent(content)
-    }
-    setHasUnsavedChanges(false)
+      const newTab = parseFileIntoTab(filePath, content, pinned)
 
-    // Set directory context from file path (if no directory already open)
-    const dir = path.substring(0, path.lastIndexOf('/'))
-    if (dir) {
-      setDirectoryPath((prev) => {
-        const target = prev || dir
-        window.electronAPI.listDirectory(target).then(setDirectoryFiles)
-        return target
-      })
-    }
+      // If opening as preview, replace existing preview tab
+      if (!pinned) {
+        const previewIndex = tabs.findIndex((t) => !t.pinned)
+        if (previewIndex >= 0) {
+          // Unwatch old preview file
+          window.electronAPI.unwatchFile(tabs[previewIndex].filePath)
+          setTabs((prev) => prev.map((t, i) => (i === previewIndex ? newTab : t)))
+          setActiveTabIndex(previewIndex)
+          window.electronAPI.watchFile(filePath)
+          return
+        }
+      }
 
-    // Watch for external changes
-    window.electronAPI.watchFile(path)
-  }, [])
+      // Add new tab
+      setTabs((prev) => [...prev, newTab])
+      setActiveTabIndex(tabs.length)
+      window.electronAPI.watchFile(filePath)
+
+      // Set directory context
+      const dir = filePath.substring(0, filePath.lastIndexOf('/'))
+      if (dir) {
+        setDirectoryPath((prev) => {
+          const target = prev || dir
+          window.electronAPI.listDirectory(target).then(setDirectoryFiles)
+          return target
+        })
+      }
+    },
+    [tabs, updateTab]
+  )
 
   const handleOpen = useCallback(async () => {
     const result = await window.electronAPI.openFile()
     if (result) {
-      loadFile(result.filePath, result.content)
+      openFileInTab(result.filePath, result.content, true) // Cmd+O always pins
     }
-  }, [loadFile])
+  }, [openFileInTab])
 
   const handleOpenDirectory = useCallback(async () => {
     const dir = await window.electronAPI.openDirectory()
@@ -91,94 +151,177 @@ export default function App() {
     }
   }, [])
 
+  // Single click from sidebar = preview (unpinned)
   const handleSelectFile = useCallback(
     async (path: string) => {
-      // Unwatch previous file
-      if (filePath) window.electronAPI.unwatchFile(filePath)
-
       const result = await window.electronAPI.readFile(path)
-      loadFile(result.filePath, result.content)
-      setMode('review')
+      openFileInTab(result.filePath, result.content, false)
     },
-    [filePath, loadFile]
+    [openFileInTab]
+  )
+
+  // Double click from sidebar = pinned
+  const handlePinFile = useCallback(
+    async (path: string) => {
+      const existingIndex = tabs.findIndex((t) => t.filePath === path)
+      if (existingIndex >= 0) {
+        updateTab(existingIndex, { pinned: true })
+        setActiveTabIndex(existingIndex)
+        return
+      }
+      const result = await window.electronAPI.readFile(path)
+      openFileInTab(result.filePath, result.content, true)
+    },
+    [tabs, updateTab, openFileInTab]
+  )
+
+  const handleCloseTab = useCallback(
+    (index: number) => {
+      const tab = tabs[index]
+      window.electronAPI.unwatchFile(tab.filePath)
+
+      setTabs((prev) => prev.filter((_, i) => i !== index))
+
+      if (index === activeTabIndex) {
+        // Activate adjacent tab
+        if (tabs.length <= 1) {
+          setActiveTabIndex(-1)
+        } else if (index >= tabs.length - 1) {
+          setActiveTabIndex(index - 1)
+        } else {
+          setActiveTabIndex(index)
+        }
+      } else if (index < activeTabIndex) {
+        setActiveTabIndex((prev) => prev - 1)
+      }
+    },
+    [tabs, activeTabIndex]
+  )
+
+  const handleTabClick = useCallback(
+    (index: number) => {
+      setActiveTabIndex(index)
+      // Clicking a tab pins it
+      if (!tabs[index].pinned) {
+        updateTab(index, { pinned: true })
+      }
+    },
+    [tabs, updateTab]
   )
 
   const handleSave = useCallback(async () => {
-    if (!filePath) return
+    if (!activeTab) return
 
     try {
-      // If in edit mode, use the edited content as the new raw content
-      const baseContent = mode === 'edit' ? editContent : rawContent
-      const serialized = serializeComments(baseContent, inlineComments, documentComments)
-      // Unwatch before saving to prevent self-triggered "modified externally"
-      await window.electronAPI.unwatchFile(filePath)
-      await window.electronAPI.saveFile(filePath, serialized)
-      // Re-watch after a delay to let fs events settle
-      setTimeout(() => { window.electronAPI.watchFile(filePath) }, 1500)
-      setRawContent(serialized)
+      const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
+      const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
 
-      // Re-parse to update clean content
+      await window.electronAPI.unwatchFile(activeTab.filePath)
+      await window.electronAPI.saveFile(activeTab.filePath, serialized)
+      setTimeout(() => { window.electronAPI.watchFile(activeTab.filePath) }, 1500)
+
       const parsed = parseComments(serialized)
-      setCleanContent(parsed.content)
-      setEditContent(parsed.content)
-      setHasUnsavedChanges(false)
+      updateActiveTab({
+        rawContent: serialized,
+        cleanContent: parsed.content,
+        editContent: parsed.content,
+        hasUnsavedChanges: false,
+        pinned: true // saving always pins
+      })
     } catch (err) {
       console.error('[Markup] Save failed:', err)
     }
-  }, [filePath, rawContent, editContent, mode, inlineComments, documentComments])
+  }, [activeTab, updateActiveTab])
 
   const handleModeToggle = useCallback(() => {
-    if (mode === 'edit') {
-      // Switching from edit to review — apply edit changes
-      setCleanContent(editContent)
-      setRawContent(editContent)
-      if (editContent !== cleanContent) {
-        setHasUnsavedChanges(true)
-      }
+    if (!activeTab) return
+
+    if (activeTab.mode === 'edit') {
+      const changed = activeTab.editContent !== activeTab.cleanContent
+      updateActiveTab({
+        mode: 'review',
+        cleanContent: activeTab.editContent,
+        rawContent: activeTab.editContent,
+        hasUnsavedChanges: activeTab.hasUnsavedChanges || changed
+      })
     } else {
-      // Switching from review to edit
-      setEditContent(cleanContent)
+      updateActiveTab({ mode: 'edit', editContent: activeTab.cleanContent })
     }
-    setMode((prev) => (prev === 'review' ? 'edit' : 'review'))
-  }, [mode, editContent, cleanContent])
+  }, [activeTab, updateActiveTab])
 
-  const handleEditChange = useCallback((content: string) => {
-    setEditContent(content)
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleEditChange = useCallback(
+    (content: string) => {
+      updateActiveTab({ editContent: content, hasUnsavedChanges: true, pinned: true })
+    },
+    [updateActiveTab]
+  )
 
-  const handleAddInlineComment = useCallback((anchor: string, body: string) => {
-    const comment = createInlineComment(anchor, body, '')
-    setInlineComments((prev) => [...prev, comment])
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleAddInlineComment = useCallback(
+    (anchor: string, body: string) => {
+      if (!activeTab) return
+      const comment = createInlineComment(anchor, body, '')
+      updateActiveTab({
+        inlineComments: [...activeTab.inlineComments, comment],
+        hasUnsavedChanges: true,
+        pinned: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
 
-  const handleAddDocumentComment = useCallback((body: string) => {
-    const comment = createDocumentComment(body, '')
-    setDocumentComments((prev) => [...prev, comment])
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleAddDocumentComment = useCallback(
+    (body: string) => {
+      if (!activeTab) return
+      const comment = createDocumentComment(body, '')
+      updateActiveTab({
+        documentComments: [...activeTab.documentComments, comment],
+        hasUnsavedChanges: true,
+        pinned: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
 
-  const handleDeleteInlineComment = useCallback((id: string) => {
-    setInlineComments((prev) => prev.filter((c) => c.id !== id))
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleDeleteInlineComment = useCallback(
+    (id: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        inlineComments: activeTab.inlineComments.filter((c) => c.id !== id),
+        hasUnsavedChanges: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
 
-  const handleDeleteDocumentComment = useCallback((id: string) => {
-    setDocumentComments((prev) => prev.filter((c) => c.id !== id))
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleDeleteDocumentComment = useCallback(
+    (id: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        documentComments: activeTab.documentComments.filter((c) => c.id !== id),
+        hasUnsavedChanges: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
 
   const handleReloadFile = useCallback(async () => {
-    if (!filePath) return
-    const result = await window.electronAPI.readFile(filePath)
-    loadFile(result.filePath, result.content)
-  }, [filePath, loadFile])
+    if (!activeTab) return
+    const result = await window.electronAPI.readFile(activeTab.filePath)
+    const parsed = parseComments(result.content)
+    updateActiveTab({
+      rawContent: result.content,
+      cleanContent: parsed.content,
+      editContent: parsed.content,
+      inlineComments: parsed.inlineComments,
+      documentComments: parsed.documentComments,
+      hasUnsavedChanges: false
+    })
+    setShowExternalChangeBar(false)
+  }, [activeTab, updateActiveTab])
 
   const handleScrollToHeading = useCallback((id: string) => {
-    // Find the heading element by scanning commentable blocks
-    const headings = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
-    for (const el of headings) {
+    const els = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
+    for (const el of els) {
       const text = el.textContent || ''
       const elId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       if (elId === id) {
@@ -191,12 +334,12 @@ export default function App() {
   // Listen for external file changes
   useEffect(() => {
     const cleanup = window.electronAPI.onFileChanged((changedPath: string) => {
-      if (changedPath === filePath) {
+      if (activeTab && changedPath === activeTab.filePath) {
         setShowExternalChangeBar(true)
       }
     })
     return cleanup
-  }, [filePath])
+  }, [activeTab])
 
   // Native menu events
   useEffect(() => {
@@ -230,7 +373,7 @@ export default function App() {
       if (!result) return
 
       if (result.type === 'file') {
-        loadFile(result.filePath, result.content)
+        openFileInTab(result.filePath, result.content, true)
       } else if (result.type === 'directory') {
         setDirectoryPath(result.dirPath)
         const dirFiles = await window.electronAPI.listDirectory(result.dirPath)
@@ -244,13 +387,25 @@ export default function App() {
       document.removeEventListener('dragover', handleDragOver)
       document.removeEventListener('drop', handleDrop)
     }
-  }, [loadFile])
+  }, [openFileInTab])
 
-  if (!filePath && !directoryPath) {
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+        e.preventDefault()
+        if (activeTabIndex >= 0) handleCloseTab(activeTabIndex)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [activeTabIndex, handleCloseTab])
+
+  if (tabs.length === 0 && !directoryPath) {
     return (
       <div className="welcome">
         <div className="welcome-content">
-          <svg className="welcome-icon" width="120" height="75" viewBox="0 0 208 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg className="welcome-icon" width="40" height="25" viewBox="0 0 208 128" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M193 5H15C9.47715 5 5 9.47715 5 15V113C5 118.523 9.47715 123 15 123H193C198.523 123 203 118.523 203 113V15C203 9.47715 198.523 5 193 5Z" stroke="currentColor" strokeWidth="10"/>
             <path d="M155 30L185 63H165V98H145V63H125L155 30Z" fill="currentColor"/>
             <path d="M30 98V30H50L70 55L90 30H110V98H90V59L70 84L50 59V98H30Z" fill="currentColor"/>
@@ -264,9 +419,7 @@ export default function App() {
               Open Folder
             </button>
           </div>
-          <p className="shortcut-hint">
-            <kbd>Cmd+O</kbd> open file
-          </p>
+          <p className="shortcut-hint">or drag a file or folder here</p>
         </div>
       </div>
     )
@@ -277,24 +430,43 @@ export default function App() {
       <header className="titlebar">
         <div className="titlebar-left" />
         <div className="titlebar-center">
-          <span className="filename">
-            {fileName}
-            {hasUnsavedChanges && <span className="unsaved-dot" title="Unsaved changes" />}
-          </span>
+          <div className="tab-bar">
+            {tabs.map((tab, i) => (
+              <div
+                key={tab.filePath}
+                className={`tab ${i === activeTabIndex ? 'active' : ''} ${!tab.pinned ? 'preview' : ''}`}
+                onClick={() => handleTabClick(i)}
+              >
+                <span className="tab-name">
+                  {tab.fileName}
+                  {tab.hasUnsavedChanges && <span className="unsaved-dot" />}
+                </span>
+                <button
+                  className="tab-close"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCloseTab(i)
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="titlebar-right">
-          {filePath && (
+          {activeTab && (
             <>
               <div className="mode-toggle">
                 <button
-                  className={`mode-button ${mode === 'review' ? 'active' : ''}`}
-                  onClick={() => mode !== 'review' && handleModeToggle()}
+                  className={`mode-button ${activeTab.mode === 'review' ? 'active' : ''}`}
+                  onClick={() => activeTab.mode !== 'review' && handleModeToggle()}
                 >
                   Review
                 </button>
                 <button
-                  className={`mode-button ${mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => mode !== 'edit' && handleModeToggle()}
+                  className={`mode-button ${activeTab.mode === 'edit' ? 'active' : ''}`}
+                  onClick={() => activeTab.mode !== 'edit' && handleModeToggle()}
                 >
                   Edit
                 </button>
@@ -302,7 +474,7 @@ export default function App() {
               <button
                 onClick={handleSave}
                 className="titlebar-button save-button"
-                disabled={!hasUnsavedChanges}
+                disabled={!activeTab.hasUnsavedChanges}
                 title="Save (Cmd+S)"
               >
                 Save
@@ -331,8 +503,9 @@ export default function App() {
             </div>
             <FileTree
               files={directoryFiles}
-              currentFile={filePath}
+              currentFile={activeTab?.filePath || null}
               onSelectFile={handleSelectFile}
+              onDoubleClickFile={handlePinFile}
             />
           </div>
           <div className="sidebar-section">
@@ -341,26 +514,31 @@ export default function App() {
         </aside>
 
         <div className="editor-pane">
-          {!filePath ? (
+          {!activeTab ? (
             <div className="editor-empty">
               <p>Select a file from the sidebar to start reviewing.</p>
             </div>
-          ) : mode === 'review' ? (
+          ) : activeTab.mode === 'review' ? (
             <ReviewMode
-              content={cleanContent}
-              inlineComments={inlineComments}
+              key={activeTab.filePath}
+              content={activeTab.cleanContent}
+              inlineComments={activeTab.inlineComments}
               onAddComment={handleAddInlineComment}
               onDeleteComment={handleDeleteInlineComment}
             />
           ) : (
-            <EditMode content={cleanContent} onChange={handleEditChange} />
+            <EditMode
+              key={activeTab.filePath}
+              content={activeTab.cleanContent}
+              onChange={handleEditChange}
+            />
           )}
         </div>
 
-        {filePath && (
+        {activeTab && (
           <div className="comments-panel">
             <DocumentComments
-              comments={documentComments}
+              comments={activeTab.documentComments}
               onAdd={handleAddDocumentComment}
               onDelete={handleDeleteDocumentComment}
             />

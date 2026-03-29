@@ -5,17 +5,20 @@ interface Props {
   files: FileEntry[]
   currentFile: string | null
   onSelectFile: (path: string) => void
+  onDoubleClickFile?: (path: string) => void
 }
 
 function FileNode({
   entry,
   currentFile,
   onSelectFile,
+  onDoubleClickFile,
   depth
 }: {
   entry: FileEntry
   currentFile: string | null
   onSelectFile: (path: string) => void
+  onDoubleClickFile?: (path: string) => void
   depth: number
 }) {
   const [expanded, setExpanded] = useState(depth < 2)
@@ -39,6 +42,7 @@ function FileNode({
                 entry={child}
                 currentFile={currentFile}
                 onSelectFile={onSelectFile}
+                onDoubleClickFile={onDoubleClickFile}
                 depth={depth + 1}
               />
             ))}
@@ -56,6 +60,7 @@ function FileNode({
         className={`file-node-row file ${isActive ? 'active' : ''}`}
         style={{ paddingLeft: `${12 + depth * 16}px` }}
         onClick={() => onSelectFile(entry.path)}
+        onDoubleClick={() => onDoubleClickFile?.(entry.path)}
       >
         <span className="file-icon">📄</span>
         <span className="file-name">{entry.name}</span>
@@ -64,7 +69,7 @@ function FileNode({
   )
 }
 
-export function FileTree({ files, currentFile, onSelectFile }: Props) {
+export function FileTree({ files, currentFile, onSelectFile, onDoubleClickFile }: Props) {
   if (files.length === 0) {
     return <p className="sidebar-empty">No markdown files found.</p>
   }
@@ -77,6 +82,7 @@ export function FileTree({ files, currentFile, onSelectFile }: Props) {
           entry={entry}
           currentFile={currentFile}
           onSelectFile={onSelectFile}
+          onDoubleClickFile={onDoubleClickFile}
           depth={0}
         />
       ))}
