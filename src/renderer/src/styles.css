@@ -102,12 +102,21 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.welcome::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
   -webkit-app-region: drag;
 }
 
 .welcome-content {
   text-align: center;
-  -webkit-app-region: no-drag;
 }
 
 .welcome-icon {
