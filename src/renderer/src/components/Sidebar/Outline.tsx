@@ -18,7 +18,7 @@ export function Outline({ headings, onClickHeading }: Props) {
         onClick={() => setExpanded(!expanded)}
       >
         <span className="outline-toggle">{expanded ? '▾' : '▸'}</span>
-        <h4 className="panel-title" style={{ marginBottom: 0 }}>Outline</h4>
+        <h4 className="panel-title" style={{ marginBottom: 0 }}>Document Outline</h4>
       </div>
       {expanded && (
         <div className="outline-list">

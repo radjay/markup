@@ -536,12 +536,12 @@ export default function App() {
 
         {activeTab && (
           <div className="comments-panel">
-            <Outline headings={headings} onClickHeading={handleScrollToHeading} />
             <DocumentComments
               comments={activeTab.documentComments}
               onAdd={handleAddDocumentComment}
               onDelete={handleDeleteDocumentComment}
             />
+            <Outline headings={headings} onClickHeading={handleScrollToHeading} />
           </div>
         )}
       </div>
