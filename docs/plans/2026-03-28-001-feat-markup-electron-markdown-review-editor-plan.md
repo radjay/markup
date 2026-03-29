@@ -1,10 +1,12 @@
 ---
 title: "feat: Markup — Native Markdown Review Editor for AI Agent Feedback"
-type: feat
-status: active
-date: 2026-03-28
+type: "feat"
+status: "active"
+date: "2026-03-28"
+markup_reviewed: true
+markup_reviewed_at: "2026-03-29T15:50:28.129Z"
+markup_status: "changes_requested"
 ---
-
 # Markup — Native Markdown Review Editor for AI Agent Feedback
 
 ## Overview
@@ -153,21 +155,17 @@ This is the core design decision. Comments must be:
 ## Architecture
 
 The system uses a microservices architecture with event-driven communication.
-<!-- @markup {"id":"c1","type":"inline","anchor":"## Architecture","author":"radjay","ts":"2026-03-28T10:30:00Z"} This is over-engineered for our scale. Consider a modular monolith instead. -->
 
 ### Database Layer
 
 We'll use PostgreSQL with read replicas.
-<!-- @markup {"id":"c2","type":"inline","anchor":"### Database Layer","author":"radjay","ts":"2026-03-28T10:32:00Z"} Good choice. Make sure to specify connection pooling strategy. -->
+
 ```
 
 **Document-level comments** — placed at the end of the file in a dedicated block:
 
 ```markdown
-<!-- @markup-doc-comments
-{"id":"d1","type":"document","author":"radjay","ts":"2026-03-28T10:35:00Z","body":"Overall the plan is solid but the timeline in Phase 2 is too aggressive. Let's discuss."}
-{"id":"d2","type":"document","author":"radjay","ts":"2026-03-28T10:36:00Z","body":"Missing error handling strategy — please add a section."}
--->
+
 ```
 
 **Review metadata** — in YAML frontmatter (appended to existing frontmatter if present):
@@ -192,7 +190,7 @@ Inline comments anchor to the **nearest preceding heading** (e.g., `## Architect
 For finer-grained anchoring (specific text selection), the comment includes an optional `selection` field with a text snippet:
 
 ```html
-<!-- @markup {"id":"c3","type":"inline","anchor":"## API Design","selection":"rate limiting","author":"radjay","ts":"..."} We need to specify rate limits per endpoint, not globally. -->
+
 ```
 
 ### What Happens When Content Changes
@@ -325,7 +323,7 @@ When invoked (e.g., `/markup-review plan.md` or triggered automatically when a f
 # Markup Comments
 
 When you encounter HTML comments in markdown files matching the pattern
-`<!-- @markup {...} ... -->`, these are review comments left by a human
+``, these are review comments left by a human
 using the Markup editor.
 
 ## How to handle them:
@@ -474,3 +472,6 @@ using the Markup editor.
 - [CodeMirror 6 Documentation](https://codemirror.net/)
 - [unified/remark](https://unifiedjs.com/) — markdown processing
 - [CriticMarkup Spec](https://fletcher.github.io/MultiMarkdown-6/syntax/critic.html) — alternative comment format reference
+<!-- @markup {"id":"c1","type":"inline","anchor":"## Architecture","author":"radjay","ts":"2026-03-28T10:30:00Z"} This is over-engineered for our scale. Consider a modular monolith instead. -->
+<!-- @markup {"id":"c2","type":"inline","anchor":"### Database Layer","author":"radjay","ts":"2026-03-28T10:32:00Z"} Good choice. Make sure to specify connection pooling strategy. -->
+<!-- @markup {"id":"c3","type":"inline","anchor":"## API Design","author":"radjay","ts":"...","selection":"rate limiting"} We need to specify rate limits per endpoint, not globally. -->

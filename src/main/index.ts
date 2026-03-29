@@ -6,6 +6,8 @@ import { createHash } from 'crypto'
 import { is } from '@electron-toolkit/utils'
 import { IPC } from '../shared/ipc-channels'
 import type { FileEntry } from '../shared/types'
+import { loadSettings, saveSettings, type Settings } from './settings'
+import { startWatching, stopAllWatching, listRecentFiles } from './folder-watcher'
 
 let mainWindow: BrowserWindow | null = null
 const watchers: Map<string, FSWatcher> = new Map()
@@ -243,6 +245,50 @@ ipcMain.handle(IPC.UNWATCH_FILE, async (_event, filePath: string) => {
   return true
 })
 
+// ---- Settings & Folder Management ----
+
+let currentSettings: Settings = { folders: [], sidebarMode: 'recent' }
+
+ipcMain.handle(IPC.SETTINGS_LOAD, async () => {
+  currentSettings = await loadSettings()
+  if (currentSettings.folders.length > 0) {
+    startWatching(currentSettings.folders)
+  }
+  return currentSettings
+})
+
+ipcMain.handle(IPC.SETTINGS_SAVE, async (_event, settings: Settings) => {
+  currentSettings = settings
+  await saveSettings(settings)
+  return true
+})
+
+ipcMain.handle(IPC.ADD_FOLDER, async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+  if (canceled || filePaths.length === 0) return null
+
+  const folder = filePaths[0]
+  if (currentSettings.folders.includes(folder)) return folder
+
+  currentSettings.folders.push(folder)
+  await saveSettings(currentSettings)
+  startWatching(currentSettings.folders)
+  return folder
+})
+
+ipcMain.handle(IPC.REMOVE_FOLDER, async (_event, folder: string) => {
+  currentSettings.folders = currentSettings.folders.filter((f) => f !== folder)
+  await saveSettings(currentSettings)
+  startWatching(currentSettings.folders)
+  return true
+})
+
+ipcMain.handle(IPC.LIST_RECENT_FILES, async () => {
+  return listRecentFiles(currentSettings.folders)
+})
+
 // ---- Native Menus ----
 
 function buildMenu(): void {
@@ -270,9 +316,9 @@ function buildMenu(): void {
           click: () => mainWindow?.webContents.send('menu:openFile')
         },
         {
-          label: 'Open Folder…',
+          label: 'Add Folder…',
           accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow?.webContents.send('menu:openDirectory')
+          click: () => mainWindow?.webContents.send('menu:addFolder')
         },
         { type: 'separator' },
         {
@@ -367,6 +413,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   for (const w of watchers.values()) w.close()
   watchers.clear()
+  stopAllWatching()
 
   if (process.platform !== 'darwin') {
     app.quit()

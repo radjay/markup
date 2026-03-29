@@ -838,7 +838,7 @@ kbd {
 /* ---- Sidebar ---- */
 
 .sidebar {
-  width: 240px;
+  width: 260px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -847,34 +847,47 @@ kbd {
   flex-shrink: 0;
 }
 
-.sidebar-section {
-  overflow-y: auto;
+.sidebar-content {
   flex: 1;
+  overflow-y: auto;
   min-height: 0;
 }
 
-.sidebar-section + .sidebar-section {
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-header {
+.sidebar-header-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 12px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
-.sidebar-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.sidebar-mode-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sidebar-mode-button {
+  background: transparent;
+  border: none;
   color: var(--text-muted);
-  padding: 12px 12px 8px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-.sidebar-header .sidebar-section-title {
-  padding: 0;
+.sidebar-mode-button.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.sidebar-mode-button:hover:not(.active) {
+  color: var(--text-secondary);
 }
 
 .sidebar-action {
@@ -894,13 +907,58 @@ kbd {
 .sidebar-empty {
   font-size: 12px;
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: 12px;
+  text-align: center;
 }
 
 /* ---- File Tree ---- */
 
 .file-tree {
   padding-bottom: 8px;
+}
+
+.folder-root-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.folder-root-row:hover {
+  background: var(--bg-hover);
+}
+
+.folder-root-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.folder-root-row:hover .folder-remove {
+  opacity: 1;
+}
+
+.folder-remove:hover {
+  color: var(--danger);
 }
 
 .file-node-row {
@@ -911,7 +969,6 @@ kbd {
   font-size: 13px;
   cursor: pointer;
   color: var(--text-secondary);
-  border-radius: 0;
   transition: background 0.1s;
   white-space: nowrap;
   overflow: hidden;
@@ -941,6 +998,73 @@ kbd {
 
 .directory .file-name {
   font-weight: 500;
+}
+
+/* ---- Recent Files ---- */
+
+.recent-files {
+  padding-bottom: 8px;
+}
+
+.recent-group {
+  margin-bottom: 4px;
+}
+
+.recent-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 12px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.recent-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.1s;
+}
+
+.recent-file-row:hover {
+  background: var(--bg-hover);
+}
+
+.recent-file-row.active {
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+
+.recent-file-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.new-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+.recent-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-file-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 /* ---- Outline ---- */
