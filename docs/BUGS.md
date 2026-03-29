@@ -2,7 +2,17 @@
 
 ## Open
 
-_Nothing open._
+### Improvement: Welcome screen logo should be larger and brighter
+- **Reported:** 2026-03-29
+- Make the SVG logo 50% larger on the launch screen and increase fill intensity
+
+### Feature: Persist last used folder(s) across sessions
+- **Reported:** 2026-03-29
+- Save working folder(s) to disk so the app opens directly to the file tree instead of the welcome screen on next launch
+
+### Feature: Multiple working folders in sidebar
+- **Reported:** 2026-03-29
+- Let the user add multiple working folders. The file sidebar shows files from all configured folders, each as a separate root.
 
 ## Resolved
 
