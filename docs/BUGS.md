@@ -10,6 +10,9 @@
 - **Reported:** 2026-03-29
 - Let the user add multiple working folders. The file sidebar shows files from all configured folders, each as a separate root.
 
+### Bug: Tab switching doesn't preserve scroll position
+- **Reported:** 2026-03-29
+- When switching between tabs, the scroll position is lost. Each tab should remember where the user was.
 
 ## Resolved
 
@@ -31,4 +34,19 @@
 ### Feature: Tabbed editor with VS Code-style preview mode
 - **Reported:** 2026-03-29
 - **Fixed:** 2026-03-29 — Full tab system: single-click = preview (italic, replaced), double-click/edit/comment = pinned. Cmd+W to close. Multiple files open simultaneously.
+- **Commit:** 6240372
+
+### Improvement: Redesigned tab bar and layout
+- **Reported:** 2026-03-29
+- **Fixed:** 2026-03-29 — Tabs moved below titlebar into editor area (Cursor-style). Active tab uses background instead of colored underline. "Modified externally" bar scoped to editor pane. Mode toggle and Save moved to tab bar right side.
+- **Commit:** (this commit)
+
+### Improvement: File watcher uses content hashing
+- **Reported:** 2026-03-29
+- **Fixed:** 2026-03-29 — Replaced noisy fs.watch with content-hash comparison. Only notifies when actual content changes. Self-saves update hash to prevent false positives.
+- **Commit:** (this commit)
+
+### Improvement: Outline moved to right panel, collapsed by default
+- **Reported:** 2026-03-29
+- **Fixed:** 2026-03-29 — Document outline moved from sidebar to right comments panel. Collapsed by default, click to expand.
 - **Commit:** (this commit)

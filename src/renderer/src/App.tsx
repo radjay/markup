@@ -216,9 +216,7 @@ export default function App() {
       const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
       const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
 
-      await window.electronAPI.unwatchFile(activeTab.filePath)
       await window.electronAPI.saveFile(activeTab.filePath, serialized)
-      setTimeout(() => { window.electronAPI.watchFile(activeTab.filePath) }, 1500)
 
       const parsed = parseComments(serialized)
       updateActiveTab({
@@ -427,70 +425,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="titlebar">
-        <div className="titlebar-left" />
-        <div className="titlebar-center">
-          <div className="tab-bar">
-            {tabs.map((tab, i) => (
-              <div
-                key={tab.filePath}
-                className={`tab ${i === activeTabIndex ? 'active' : ''} ${!tab.pinned ? 'preview' : ''}`}
-                onClick={() => handleTabClick(i)}
-              >
-                <span className="tab-name">
-                  {tab.fileName}
-                  {tab.hasUnsavedChanges && <span className="unsaved-dot" />}
-                </span>
-                <button
-                  className="tab-close"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCloseTab(i)
-                  }}
-                >
-                  &times;
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="titlebar-right">
-          {activeTab && (
-            <>
-              <div className="mode-toggle">
-                <button
-                  className={`mode-button ${activeTab.mode === 'review' ? 'active' : ''}`}
-                  onClick={() => activeTab.mode !== 'review' && handleModeToggle()}
-                >
-                  Review
-                </button>
-                <button
-                  className={`mode-button ${activeTab.mode === 'edit' ? 'active' : ''}`}
-                  onClick={() => activeTab.mode !== 'edit' && handleModeToggle()}
-                >
-                  Edit
-                </button>
-              </div>
-              <button
-                onClick={handleSave}
-                className="titlebar-button save-button"
-                disabled={!activeTab.hasUnsavedChanges}
-                title="Save (Cmd+S)"
-              >
-                Save
-              </button>
-            </>
-          )}
-        </div>
-      </header>
-
-      {showExternalChangeBar && (
-        <div className="external-change-bar">
-          <span>This file was modified externally.</span>
-          <button onClick={handleReloadFile}>Reload</button>
-          <button onClick={() => setShowExternalChangeBar(false)}>Dismiss</button>
-        </div>
-      )}
+      <div className="titlebar-drag" />
 
       <div className="main-content">
         <aside className="sidebar">
@@ -508,35 +443,100 @@ export default function App() {
               onDoubleClickFile={handlePinFile}
             />
           </div>
-          <div className="sidebar-section">
-            <Outline headings={headings} onClickHeading={handleScrollToHeading} />
-          </div>
         </aside>
 
-        <div className="editor-pane">
-          {!activeTab ? (
-            <div className="editor-empty">
-              <p>Select a file from the sidebar to start reviewing.</p>
+        <div className="editor-area">
+          {tabs.length > 0 && (
+            <div className="tab-bar">
+              <div className="tab-list">
+                {tabs.map((tab, i) => (
+                  <div
+                    key={tab.filePath}
+                    className={`tab ${i === activeTabIndex ? 'active' : ''} ${!tab.pinned ? 'preview' : ''}`}
+                    onClick={() => handleTabClick(i)}
+                  >
+                    <span className="tab-name">
+                      {tab.fileName}
+                    </span>
+                    {tab.hasUnsavedChanges ? (
+                      <span className="unsaved-dot" />
+                    ) : (
+                      <button
+                        className="tab-close"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCloseTab(i)
+                        }}
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {activeTab && (
+                <div className="tab-bar-right">
+                  <div className="mode-toggle">
+                    <button
+                      className={`mode-button ${activeTab.mode === 'review' ? 'active' : ''}`}
+                      onClick={() => activeTab.mode !== 'review' && handleModeToggle()}
+                    >
+                      Review
+                    </button>
+                    <button
+                      className={`mode-button ${activeTab.mode === 'edit' ? 'active' : ''}`}
+                      onClick={() => activeTab.mode !== 'edit' && handleModeToggle()}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleSave}
+                    className="titlebar-button save-button"
+                    disabled={!activeTab.hasUnsavedChanges}
+                    title="Save (Cmd+S)"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
             </div>
-          ) : activeTab.mode === 'review' ? (
-            <ReviewMode
-              key={activeTab.filePath}
-              content={activeTab.cleanContent}
-              inlineComments={activeTab.inlineComments}
-              onAddComment={handleAddInlineComment}
-              onDeleteComment={handleDeleteInlineComment}
-            />
-          ) : (
-            <EditMode
-              key={activeTab.filePath}
-              content={activeTab.cleanContent}
-              onChange={handleEditChange}
-            />
           )}
+
+          {showExternalChangeBar && (
+            <div className="external-change-bar">
+              <span>This file was modified externally.</span>
+              <button onClick={handleReloadFile}>Reload</button>
+              <button onClick={() => setShowExternalChangeBar(false)}>Dismiss</button>
+            </div>
+          )}
+
+          <div className="editor-pane">
+            {!activeTab ? (
+              <div className="editor-empty">
+                <p>Select a file from the sidebar to start reviewing.</p>
+              </div>
+            ) : activeTab.mode === 'review' ? (
+              <ReviewMode
+                key={activeTab.filePath}
+                content={activeTab.cleanContent}
+                inlineComments={activeTab.inlineComments}
+                onAddComment={handleAddInlineComment}
+                onDeleteComment={handleDeleteInlineComment}
+              />
+            ) : (
+              <EditMode
+                key={activeTab.filePath}
+                content={activeTab.cleanContent}
+                onChange={handleEditChange}
+              />
+            )}
+          </div>
         </div>
 
         {activeTab && (
           <div className="comments-panel">
+            <Outline headings={headings} onClickHeading={handleScrollToHeading} />
             <DocumentComments
               comments={activeTab.documentComments}
               onAdd={handleAddDocumentComment}

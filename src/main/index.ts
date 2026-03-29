@@ -2,12 +2,18 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron
 import { join, extname, basename } from 'path'
 import { readFile, writeFile, readdir, stat } from 'fs/promises'
 import { watch, type FSWatcher } from 'fs'
+import { createHash } from 'crypto'
 import { is } from '@electron-toolkit/utils'
 import { IPC } from '../shared/ipc-channels'
 import type { FileEntry } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 const watchers: Map<string, FSWatcher> = new Map()
+const fileHashes: Map<string, string> = new Map()
+
+function hashContent(content: string): string {
+  return createHash('md5').update(content).digest('hex')
+}
 
 function createWindow(): BrowserWindow {
   const iconPath = join(__dirname, '../../assets/app-icon.png')
@@ -169,6 +175,8 @@ ipcMain.handle(IPC.READ_FILE, async (_event, filePath: string) => {
 
 ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) => {
   try {
+    // Update hash before writing so the watcher knows this is our save
+    fileHashes.set(filePath, hashContent(content))
     await writeFile(filePath, content, 'utf-8')
     return { filePath, success: true }
   } catch (err) {
@@ -191,11 +199,32 @@ ipcMain.handle(IPC.WATCH_FILE, async (_event, filePath: string) => {
   const existing = watchers.get(filePath)
   if (existing) existing.close()
 
+  // Store initial content hash
   try {
-    const watcher = watch(filePath, (eventType) => {
-      if (eventType === 'change' && mainWindow) {
-        mainWindow.webContents.send(IPC.FILE_CHANGED, filePath)
-      }
+    const content = await readFile(filePath, 'utf-8')
+    fileHashes.set(filePath, hashContent(content))
+  } catch { /* ignore */ }
+
+  try {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+    const watcher = watch(filePath, () => {
+      // Debounce: fs.watch fires multiple times per change on macOS
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(async () => {
+        try {
+          const content = await readFile(filePath, 'utf-8')
+          const newHash = hashContent(content)
+          const oldHash = fileHashes.get(filePath)
+
+          if (oldHash && newHash !== oldHash) {
+            fileHashes.set(filePath, newHash)
+            if (mainWindow) {
+              mainWindow.webContents.send(IPC.FILE_CHANGED, filePath)
+            }
+          }
+        } catch { /* file may have been deleted */ }
+      }, 300)
     })
     watchers.set(filePath, watcher)
     return true
@@ -210,6 +239,7 @@ ipcMain.handle(IPC.UNWATCH_FILE, async (_event, filePath: string) => {
     watcher.close()
     watchers.delete(filePath)
   }
+  fileHashes.delete(filePath)
   return true
 })
 
