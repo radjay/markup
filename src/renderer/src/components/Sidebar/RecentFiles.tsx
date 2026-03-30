@@ -26,7 +26,6 @@ function relativeTime(mtime: number): string {
 export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onDoubleClickFile }: Props) {
   const [, setTick] = useState(0)
 
-  // Update relative timestamps every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 30000)
     return () => clearInterval(interval)
@@ -36,48 +35,36 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
     return <p className="sidebar-empty">No markdown files found.</p>
   }
 
-  // Group by folder
-  const grouped = new Map<string, WatchedFile[]>()
-  for (const file of files) {
-    const list = grouped.get(file.folder) || []
-    list.push(file)
-    grouped.set(file.folder, list)
-  }
-
+  // Flat list sorted by mtime descending (already sorted from backend)
   return (
     <div className="recent-files">
-      {Array.from(grouped.entries()).map(([folder, folderFiles]) => (
-        <div key={folder} className="recent-group">
-          <div className="recent-group-header">{folderFiles[0].folderName}</div>
-          {folderFiles.map((file) => {
-            const isActive = file.path === currentFile
-            const isNew = !viewedFiles.has(file.path)
+      {files.map((file) => {
+        const isActive = file.path === currentFile
+        const isNew = !viewedFiles.has(file.path)
 
-            // Show parent path without the filename
-            const parentPath = file.relativePath.includes('/')
-              ? file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
-              : ''
+        // Show folder + relative path for context
+        const contextPath = file.relativePath.includes('/')
+          ? `${file.folderName}/${file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))}`
+          : file.folderName
 
-            return (
-              <div
-                key={file.path}
-                className={`recent-file-row ${isActive ? 'active' : ''}`}
-                onClick={() => onSelectFile(file.path)}
-                onDoubleClick={() => onDoubleClickFile?.(file.path)}
-              >
-                <div className="recent-file-info">
-                  {isNew && <span className="new-badge" />}
-                  <div className="recent-file-details">
-                    <span className="recent-file-name">{file.name}</span>
-                    {parentPath && <span className="recent-file-path">{parentPath}</span>}
-                  </div>
-                </div>
-                <span className="recent-file-time">{relativeTime(file.mtime)}</span>
+        return (
+          <div
+            key={file.path}
+            className={`recent-file-row ${isActive ? 'active' : ''}`}
+            onClick={() => onSelectFile(file.path)}
+            onDoubleClick={() => onDoubleClickFile?.(file.path)}
+          >
+            <div className="recent-file-info">
+              {isNew && <span className="new-badge" />}
+              <div className="recent-file-details">
+                <span className="recent-file-name">{file.name}</span>
+                <span className="recent-file-path">{contextPath}</span>
               </div>
-            )
-          })}
-        </div>
-      ))}
+            </div>
+            <span className="recent-file-time">{relativeTime(file.mtime)}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
