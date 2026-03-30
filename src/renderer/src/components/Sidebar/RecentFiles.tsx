@@ -35,17 +35,14 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
     return <p className="sidebar-empty">No markdown files found.</p>
   }
 
-  // Flat list sorted by mtime descending (already sorted from backend)
   return (
     <div className="recent-files">
       {files.map((file) => {
         const isActive = file.path === currentFile
         const isNew = !viewedFiles.has(file.path)
-
-        // Show folder + relative path for context
-        const contextPath = file.relativePath.includes('/')
-          ? `${file.folderName}/${file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))}`
-          : file.folderName
+        const repoLabel = file.repoBranch
+          ? `${file.repoName}:${file.repoBranch}`
+          : file.repoName
 
         return (
           <div
@@ -58,7 +55,8 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
               {isNew && <span className="new-badge" />}
               <div className="recent-file-details">
                 <span className="recent-file-name">{file.name}</span>
-                <span className="recent-file-path">{contextPath}</span>
+                {file.repoPath && <span className="recent-file-path">/{file.repoPath}</span>}
+                <span className="recent-file-repo">{repoLabel}</span>
               </div>
             </div>
             <span className="recent-file-time">{relativeTime(file.mtime)}</span>

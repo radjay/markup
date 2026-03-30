@@ -1075,6 +1075,15 @@ kbd {
   margin-top: -1px;
 }
 
+.recent-file-repo {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 .recent-file-time {
   font-size: 11px;
   color: var(--text-muted);

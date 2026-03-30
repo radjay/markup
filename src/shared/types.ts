@@ -60,7 +60,8 @@ export interface WatchedFile {
   path: string
   name: string
   folder: string
-  folderName: string
-  relativePath: string
+  repoName: string
+  repoBranch: string
+  repoPath: string
   mtime: number
 }
