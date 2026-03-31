@@ -63,6 +63,13 @@ const api = {
     return () => ipcRenderer.removeListener('menu:toggleMode', callback)
   },
 
+  // CLI: open file from command line
+  onCliOpenFile: (callback: (filePath: string) => void) => {
+    const handler = (_event: unknown, filePath: string) => callback(filePath)
+    ipcRenderer.on('cli:openFile', handler)
+    return () => ipcRenderer.removeListener('cli:openFile', handler)
+  },
+
   // Drag and drop
   handleDrop: (filePath: string): Promise<{ type: 'file'; filePath: string; content: string } | { type: 'directory'; dirPath: string } | null> =>
     ipcRenderer.invoke('drop:file', filePath)

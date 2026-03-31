@@ -10,6 +10,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "check": "electron-vite build",
     "dist": "npm run build && electron-builder --mac",
     "dist:dir": "npm run build && electron-builder --mac --dir"
   },

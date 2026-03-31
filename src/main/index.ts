@@ -347,6 +347,45 @@ ipcMain.handle('drop:file', async (_event, filePath: string) => {
   return null
 })
 
+// ---- CLI: open file from command line ----
+
+function openFileFromPath(filePath: string): void {
+  if (!mainWindow) return
+  const absPath = filePath.startsWith('/') ? filePath : join(process.cwd(), filePath)
+  const ext = extname(absPath).toLowerCase()
+  if (ext !== '.md' && ext !== '.markdown') return
+  mainWindow.webContents.send('cli:openFile', absPath)
+  mainWindow.focus()
+}
+
+// Single instance lock — second launch sends argv to the running instance
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // On macOS, files come via open-file event. On other platforms, check argv.
+    const filePath = argv.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
+    if (filePath) openFileFromPath(filePath)
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
+
+// macOS: open-file event fires when files are dropped on dock icon or opened via "open" command
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  if (app.isReady() && mainWindow) {
+    openFileFromPath(filePath)
+  } else {
+    // App not ready yet — defer until window is created
+    app.whenReady().then(() => openFileFromPath(filePath))
+  }
+})
+
 // ---- App lifecycle ----
 
 app.whenReady().then(() => {
@@ -357,6 +396,12 @@ app.whenReady().then(() => {
 
   buildMenu()
   createWindow()
+
+  // Open files passed via command line arguments
+  const fileArg = process.argv.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
+  if (fileArg) {
+    mainWindow?.webContents.once('did-finish-load', () => openFileFromPath(fileArg))
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

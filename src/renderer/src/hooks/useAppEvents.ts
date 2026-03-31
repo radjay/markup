@@ -44,16 +44,17 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
     [tabManager]
   )
 
-  // Menu events
+  // Menu events + CLI open
   useEffect(() => {
     const cleanups = [
       window.electronAPI.onMenuOpenFile(() => handleOpen()),
       window.electronAPI.onMenuAddFolder(() => workspace.addFolder()),
       window.electronAPI.onMenuSave(() => doc.save()),
-      window.electronAPI.onMenuToggleMode(() => doc.modeToggle())
+      window.electronAPI.onMenuToggleMode(() => doc.modeToggle()),
+      window.electronAPI.onCliOpenFile((filePath: string) => handlePinFile(filePath))
     ]
     return () => cleanups.forEach((c) => c())
-  }, [handleOpen, workspace, doc])
+  }, [handleOpen, handlePinFile, workspace, doc])
 
   // Drag and drop
   useEffect(() => {

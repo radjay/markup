@@ -30,14 +30,16 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
     const result: HeadingEntry[] = []
+    const idCounts = new Map<string, number>()
     for (const line of activeTab.cleanContent.split('\n')) {
       const match = line.match(/^(#{1,3})\s+(.+)$/)
       if (match) {
         const text = match[2].trim()
-        result.push({
-          level: match[1].length, text,
-          id: text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-        })
+        const baseId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const count = idCounts.get(baseId) || 0
+        idCounts.set(baseId, count + 1)
+        const id = count === 0 ? baseId : `${baseId}-${count}`
+        result.push({ level: match[1].length, text, id })
       }
     }
     return result
@@ -161,13 +163,41 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
   }, [activeTab, updateActiveTab])
 
   const scrollToHeading = useCallback((id: string) => {
-    const els = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
-    for (const el of els) {
-      const text = el.textContent || ''
-      const elId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-      if (elId === id) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break }
+    if (activeTab?.mode === 'edit') {
+      // In edit mode, find the heading line in markdown content and scroll CodeMirror
+      const content = activeTab.editContent || activeTab.cleanContent
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^#{1,3}\s+(.+)$/)
+        if (match) {
+          const lineId = match[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+          if (lineId === id) {
+            const cmLine = document.querySelector(`.cm-editor .cm-line:nth-child(${i + 1})`)
+            if (cmLine) {
+              cmLine.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            } else {
+              // Fallback: scroll editor pane by estimated line height
+              const editorPane = document.querySelector('.editor-pane')
+              if (editorPane) editorPane.scrollTop = i * 22
+            }
+            break
+          }
+        }
+      }
+    } else {
+      // In review mode, find the rendered heading element (with duplicate disambiguation)
+      const els = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
+      const elIdCounts = new Map<string, number>()
+      for (const el of els) {
+        const text = el.textContent || ''
+        const baseId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const count = elIdCounts.get(baseId) || 0
+        elIdCounts.set(baseId, count + 1)
+        const elId = count === 0 ? baseId : `${baseId}-${count}`
+        if (elId === id) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break }
+      }
     }
-  }, [])
+  }, [activeTab])
 
   const dismissExternalChange = useCallback(() => setShowExternalChangeBar(false), [])
   const dismissSaveError = useCallback(() => setSaveError(null), [])
