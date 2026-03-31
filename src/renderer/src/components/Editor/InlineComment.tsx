@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Pencil } from 'lucide-react'
 import type { InlineComment as InlineCommentType } from '../../../../shared/types'
 
 interface Props {
@@ -6,16 +7,19 @@ interface Props {
   comments: InlineCommentType[]
   onSubmit: (body: string) => void
   onClose: () => void
+  onEdit: (id: string, body: string) => void
   onDelete: (id: string) => void
 }
 
-export function InlineComment({ anchor, comments, onSubmit, onClose, onDelete }: Props) {
+export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onDelete }: Props) {
   const [text, setText] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+    if (!editingId) inputRef.current?.focus()
+  }, [editingId])
 
   const handleSubmit = () => {
     const trimmed = text.trim()
@@ -32,6 +36,34 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onDelete }:
     }
     if (e.key === 'Escape') {
       onClose()
+    }
+  }
+
+  const startEdit = (comment: InlineCommentType) => {
+    setEditingId(comment.id)
+    setEditText(comment.body)
+  }
+
+  const saveEdit = () => {
+    if (editingId && editText.trim()) {
+      onEdit(editingId, editText.trim())
+      setEditingId(null)
+      setEditText('')
+    }
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      saveEdit()
+    }
+    if (e.key === 'Escape') {
+      cancelEdit()
     }
   }
 
@@ -52,15 +84,40 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onDelete }:
                 <span className="comment-time">
                   {new Date(c.ts).toLocaleString()}
                 </span>
-                <button
-                  className="comment-delete"
-                  onClick={() => onDelete(c.id)}
-                  title="Delete comment"
-                >
-                  &times;
-                </button>
+                <div className="comment-item-actions">
+                  <button
+                    className="comment-edit"
+                    onClick={() => startEdit(c)}
+                    title="Edit comment"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    className="comment-delete"
+                    onClick={() => onDelete(c.id)}
+                    title="Delete comment"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
-              <div className="comment-body">{c.body}</div>
+              {editingId === c.id ? (
+                <div className="comment-edit-area">
+                  <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
+                    rows={2}
+                    autoFocus
+                  />
+                  <div className="comment-edit-actions">
+                    <button onClick={cancelEdit} className="comment-edit-cancel">Cancel</button>
+                    <button onClick={saveEdit} disabled={!editText.trim()} className="comment-submit">Save</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="comment-body">{c.body}</div>
+              )}
             </div>
           ))}
         </div>

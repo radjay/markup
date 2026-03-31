@@ -6,11 +6,15 @@ import type { TabManager } from './useTabs'
 export interface ActiveDocumentState {
   headings: HeadingEntry[]
   showExternalChangeBar: boolean
+  saveError: string | null
+  dismissSaveError: () => void
   save: () => Promise<void>
   modeToggle: () => void
   editChange: (content: string) => void
   addInlineComment: (anchor: string, body: string) => void
   addDocumentComment: (body: string) => void
+  editInlineComment: (id: string, body: string) => void
+  editDocumentComment: (id: string, body: string) => void
   deleteInlineComment: (id: string) => void
   deleteDocumentComment: (id: string) => void
   reloadFile: () => Promise<void>
@@ -21,6 +25,7 @@ export interface ActiveDocumentState {
 export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
@@ -50,6 +55,7 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
 
   const save = useCallback(async () => {
     if (!activeTab) return
+    setSaveError(null)
     try {
       const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
       const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
@@ -60,7 +66,8 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         hasUnsavedChanges: false, pinned: true
       })
     } catch (err) {
-      console.error('[Markup] Save failed:', err)
+      const msg = err instanceof Error ? err.message : 'Save failed'
+      setSaveError(msg)
     }
   }, [activeTab, updateActiveTab])
 
@@ -104,6 +111,28 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
     [activeTab, updateActiveTab]
   )
 
+  const editInlineComment = useCallback(
+    (id: string, body: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        inlineComments: activeTab.inlineComments.map((c) => c.id === id ? { ...c, body } : c),
+        hasUnsavedChanges: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
+
+  const editDocumentComment = useCallback(
+    (id: string, body: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        documentComments: activeTab.documentComments.map((c) => c.id === id ? { ...c, body } : c),
+        hasUnsavedChanges: true
+      })
+    },
+    [activeTab, updateActiveTab]
+  )
+
   const deleteInlineComment = useCallback(
     (id: string) => {
       if (!activeTab) return
@@ -141,11 +170,12 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
   }, [])
 
   const dismissExternalChange = useCallback(() => setShowExternalChangeBar(false), [])
+  const dismissSaveError = useCallback(() => setSaveError(null), [])
 
   return {
-    headings, showExternalChangeBar,
+    headings, showExternalChangeBar, saveError, dismissSaveError,
     save, modeToggle, editChange,
-    addInlineComment, addDocumentComment, deleteInlineComment, deleteDocumentComment,
+    addInlineComment, addDocumentComment, editInlineComment, editDocumentComment, deleteInlineComment, deleteDocumentComment,
     reloadFile, scrollToHeading, dismissExternalChange
   }
 }

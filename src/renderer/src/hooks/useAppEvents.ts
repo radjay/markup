@@ -17,8 +17,12 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
 
   const handleSelectFile = useCallback(
     async (path: string) => {
-      const result = await window.electronAPI.readFile(path)
-      tabManager.openFileInTab(result.filePath, result.content, false)
+      try {
+        const result = await window.electronAPI.readFile(path)
+        tabManager.openFileInTab(result.filePath, result.content, false)
+      } catch {
+        window.alert(`File not found:\n${path}`)
+      }
     },
     [tabManager]
   )
@@ -30,8 +34,12 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
         tabManager.updateTab(existingIndex, { pinned: true })
         return
       }
-      const result = await window.electronAPI.readFile(path)
-      tabManager.openFileInTab(result.filePath, result.content, true)
+      try {
+        const result = await window.electronAPI.readFile(path)
+        tabManager.openFileInTab(result.filePath, result.content, true)
+      } catch {
+        window.alert(`File not found:\n${path}`)
+      }
     },
     [tabManager]
   )

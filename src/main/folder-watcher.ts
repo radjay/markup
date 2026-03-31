@@ -2,7 +2,7 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import { stat, readdir, readFile } from 'fs/promises'
 import { join, extname, basename, relative, dirname } from 'path'
 import { existsSync } from 'fs'
-import { BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 
 export interface WatchedFile {
@@ -20,9 +20,36 @@ const watchers: Map<string, FSWatcher> = new Map()
 // Cache git info per folder to avoid repeated filesystem lookups
 const gitInfoCache: Map<string, { root: string; name: string; branch: string }> = new Map()
 
-function getMainWindow(): BrowserWindow | null {
-  const windows = BrowserWindow.getAllWindows()
-  return windows.length > 0 ? windows[0] : null
+// Reference to the main window, set by index.ts after window creation
+let _win: BrowserWindow | null = null
+
+export function setWatcherWindow(win: BrowserWindow): void {
+  _win = win
+}
+
+// Track self-saves to suppress false "modified externally" notifications
+const recentSaves = new Map<string, number>()
+const SAVE_IGNORE_WINDOW_MS = 2000
+
+export function markSelfSave(filePath: string): void {
+  recentSaves.set(filePath, Date.now())
+}
+
+function wasSelfSave(filePath: string): boolean {
+  const savedAt = recentSaves.get(filePath)
+  if (!savedAt) return false
+  if (Date.now() - savedAt < SAVE_IGNORE_WINDOW_MS) {
+    return true
+  }
+  // Expired — clean up
+  recentSaves.delete(filePath)
+  return false
+}
+
+function sendToRenderer(channel: string, ...args: unknown[]): void {
+  if (_win && !_win.isDestroyed()) {
+    _win.webContents.send(channel, ...args)
+  }
 }
 
 function isMd(filePath: string): boolean {
@@ -68,15 +95,17 @@ export function startWatching(folders: string[]): void {
   stopAllWatching()
 
   for (const folder of folders) {
-    // Watch only .md files using a glob — avoids opening file descriptors for every file
-    const watcher = chokidar.watch(join(folder, '**/*.md'), {
+    // Watch the folder directly — chokidar v5 does not support glob patterns
+    const watcher = chokidar.watch(folder, {
       ignored: [
         /(^|[/\\])\./,
         /node_modules/,
         /\.git/,
-        /\bout\//,
-        /\bdist\//,
-        /\brelease\//
+        /\bout\b/,
+        /\bdist\b/,
+        /\brelease\b/,
+        (filePath: string, stats?: import('fs').Stats) =>
+          stats?.isFile() === true && !isMd(filePath)
       ],
       persistent: true,
       ignoreInitial: true,
@@ -86,22 +115,19 @@ export function startWatching(folders: string[]): void {
 
     watcher.on('add', (filePath) => {
       if (isMd(filePath)) {
-        const win = getMainWindow()
-        if (win) win.webContents.send(IPC.FILE_ADDED, filePath, folder)
+        sendToRenderer(IPC.FILE_ADDED, filePath, folder)
       }
     })
 
     watcher.on('change', (filePath) => {
-      if (isMd(filePath)) {
-        const win = getMainWindow()
-        if (win) win.webContents.send(IPC.FILE_CHANGED, filePath, folder)
+      if (isMd(filePath) && !wasSelfSave(filePath)) {
+        sendToRenderer(IPC.FILE_CHANGED, filePath, folder)
       }
     })
 
     watcher.on('unlink', (filePath) => {
       if (isMd(filePath)) {
-        const win = getMainWindow()
-        if (win) win.webContents.send(IPC.FILE_REMOVED, filePath, folder)
+        sendToRenderer(IPC.FILE_REMOVED, filePath, folder)
       }
     })
 
@@ -110,7 +136,7 @@ export function startWatching(folders: string[]): void {
 }
 
 export function stopAllWatching(): void {
-  for (const w of watchers.values()) w.close()
+  watchers.forEach((w) => w.close())
   watchers.clear()
 }
 
@@ -183,6 +209,15 @@ export async function listRecentFiles(folders: string[]): Promise<WatchedFile[]>
 
   allFiles.sort((a, b) => b.mtime - a.mtime)
   return allFiles
+}
+
+export async function getGitInfoForFolders(folders: string[]): Promise<Record<string, { name: string; branch: string }>> {
+  const result: Record<string, { name: string; branch: string }> = {}
+  for (const folder of folders) {
+    const info = await getGitInfo(folder)
+    result[folder] = { name: info.name, branch: info.branch }
+  }
+  return result
 }
 
 // Clear cached git info (e.g., when branch changes)

@@ -15,6 +15,7 @@ export interface Tab {
   hasUnsavedChanges: boolean
   mode: EditorMode
   pinned: boolean
+  scrollTop: number
 }
 
 function parseFileIntoTab(filePath: string, content: string, pinned: boolean): Tab {
@@ -34,7 +35,7 @@ function parseFileIntoTab(filePath: string, content: string, pinned: boolean): T
 
   return {
     filePath, fileName, rawContent: content, cleanContent, editContent: cleanContent,
-    inlineComments, documentComments, hasUnsavedChanges: false, mode: 'review', pinned
+    inlineComments, documentComments, hasUnsavedChanges: false, mode: 'review', pinned, scrollTop: 0
   }
 }
 
@@ -72,6 +73,14 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
     [activeTabIndex]
   )
 
+  const confirmDiscardChanges = useCallback(
+    (tab: Tab | null): boolean => {
+      if (!tab || !tab.hasUnsavedChanges) return true
+      return window.confirm(`"${tab.fileName}" has unsaved changes. Discard them?`)
+    },
+    []
+  )
+
   const openFileInTab = useCallback(
     (filePath: string, content: string, pinned: boolean) => {
       const existingIndex = tabs.findIndex((t) => t.filePath === filePath)
@@ -87,6 +96,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
       if (!pinned) {
         const previewIndex = tabs.findIndex((t) => !t.pinned)
         if (previewIndex >= 0) {
+          if (!confirmDiscardChanges(tabs[previewIndex])) return
           window.electronAPI.unwatchFile(tabs[previewIndex].filePath)
           setTabs((prev) => prev.map((t, i) => (i === previewIndex ? newTab : t)))
           setActiveTabIndex(previewIndex)
@@ -101,12 +111,13 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
       window.electronAPI.watchFile(filePath)
       onFileViewed?.(filePath)
     },
-    [tabs, updateTab, onFileViewed]
+    [tabs, updateTab, onFileViewed, confirmDiscardChanges]
   )
 
   const closeTab = useCallback(
     (index: number) => {
       const tab = tabs[index]
+      if (!confirmDiscardChanges(tab)) return
       window.electronAPI.unwatchFile(tab.filePath)
       setTabs((prev) => prev.filter((_, i) => i !== index))
       if (index === activeTabIndex) {
@@ -117,7 +128,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
         setActiveTabIndex((prev) => prev - 1)
       }
     },
-    [tabs, activeTabIndex]
+    [tabs, activeTabIndex, confirmDiscardChanges]
   )
 
   const clickTab = useCallback(

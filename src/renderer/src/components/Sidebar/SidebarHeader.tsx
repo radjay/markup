@@ -1,3 +1,5 @@
+import { FolderPlus } from 'lucide-react'
+
 interface Props {
   mode: 'tree' | 'recent'
   onModeChange: (mode: 'tree' | 'recent') => void
@@ -12,7 +14,7 @@ export function SidebarHeader({ mode, onModeChange, onAddFolder }: Props) {
           className={`sidebar-mode-button ${mode === 'tree' ? 'active' : ''}`}
           onClick={() => onModeChange('tree')}
         >
-          Tree
+          Files
         </button>
         <button
           className={`sidebar-mode-button ${mode === 'recent' ? 'active' : ''}`}
@@ -22,7 +24,7 @@ export function SidebarHeader({ mode, onModeChange, onAddFolder }: Props) {
         </button>
       </div>
       <button className="sidebar-action" onClick={onAddFolder} title="Add folder">
-        +
+        <FolderPlus size={16} />
       </button>
     </div>
   )

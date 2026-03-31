@@ -5,7 +5,7 @@ import { is } from '@electron-toolkit/utils'
 import { IPC } from '../shared/ipc-channels'
 import type { FileEntry } from '../shared/types'
 import { loadSettings, saveSettings, type Settings } from './settings'
-import { startWatching, stopAllWatching, listRecentFiles } from './folder-watcher'
+import { startWatching, stopAllWatching, listRecentFiles, setWatcherWindow, markSelfSave, getGitInfoForFolders } from './folder-watcher'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -24,6 +24,10 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false
     }
   })
+
+  // Share the window reference with folder-watcher so it can send IPC events
+  // (same pattern as menu events which use mainWindow?.webContents.send)
+  setWatcherWindow(mainWindow)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -169,6 +173,7 @@ ipcMain.handle(IPC.READ_FILE, async (_event, filePath: string) => {
 
 ipcMain.handle(IPC.SAVE_FILE, async (_event, filePath: string, content: string) => {
   try {
+    markSelfSave(filePath)
     await writeFile(filePath, content, 'utf-8')
     return { filePath, success: true }
   } catch (err) {
@@ -233,6 +238,10 @@ ipcMain.handle(IPC.REMOVE_FOLDER, async (_event, folder: string) => {
 
 ipcMain.handle(IPC.LIST_RECENT_FILES, async () => {
   return listRecentFiles(currentSettings.folders)
+})
+
+ipcMain.handle('folder:gitInfo', async () => {
+  return getGitInfoForFolders(currentSettings.folders)
 })
 
 // ---- Native Menus ----

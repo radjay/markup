@@ -25,6 +25,8 @@ const api = {
   removeFolder: (folder: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.REMOVE_FOLDER, folder),
   listRecentFiles: (): Promise<WatchedFile[]> => ipcRenderer.invoke(IPC.LIST_RECENT_FILES),
+  getGitInfo: (): Promise<Record<string, { name: string; branch: string }>> =>
+    ipcRenderer.invoke('folder:gitInfo'),
 
   // Events
   onFileChanged: (callback: (filePath: string) => void) => {

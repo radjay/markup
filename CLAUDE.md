@@ -15,6 +15,10 @@ Electron-based native markdown editor for reviewing AI-generated plans and docum
 - Electron (desktop app)
 - TypeScript
 
+## Conventions
+
+- All icons must use Lucide Icons (`lucide-react`). Never use emoji or Unicode symbols for icons.
+
 ## Architecture
 
 - Main process: Electron shell, file I/O, window management

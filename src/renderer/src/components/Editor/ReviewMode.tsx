@@ -9,6 +9,7 @@ interface Props {
   content: string
   inlineComments: InlineCommentType[]
   onAddComment: (anchor: string, body: string) => void
+  onEditComment: (id: string, body: string) => void
   onDeleteComment: (id: string) => void
 }
 
@@ -27,7 +28,7 @@ function extractText(children: ReactNode): string {
   return ''
 }
 
-export function ReviewMode({ content, inlineComments, onAddComment, onDeleteComment }: Props) {
+export function ReviewMode({ content, inlineComments, onAddComment, onEditComment, onDeleteComment }: Props) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null)
 
   const handleBlockClick = useCallback((anchor: string, e: React.MouseEvent) => {
@@ -50,27 +51,38 @@ export function ReviewMode({ content, inlineComments, onAddComment, onDeleteComm
     [inlineComments]
   )
 
+  // Track sequential comment numbering across the document
+  let commentCounter = 0
+
   // Render a commentable wrapper around a block element
   const renderBlock = (anchor: string, children: ReactNode) => {
     const comments = getCommentsForAnchor(anchor)
     const isActive = activeAnchor === anchor
     const hasComments = comments.length > 0
 
+    // Assign sequential number for this block's comments
+    let badgeNumber = 0
+    if (hasComments) {
+      commentCounter += comments.length
+      badgeNumber = commentCounter
+    }
+
     return (
       <div
         className={`commentable-block ${isActive ? 'active' : ''} ${hasComments ? 'has-comments' : ''}`}
         onClick={(e) => handleBlockClick(anchor, e)}
       >
-        {children}
         {hasComments && !isActive && (
-          <span className="comment-badge">{comments.length}</span>
+          <span className="comment-badge">{badgeNumber}</span>
         )}
+        {children}
         {isActive && (
           <InlineComment
             anchor={anchor}
             comments={comments}
             onSubmit={handleSubmitComment}
             onClose={() => setActiveAnchor(null)}
+            onEdit={onEditComment}
             onDelete={onDeleteComment}
           />
         )}

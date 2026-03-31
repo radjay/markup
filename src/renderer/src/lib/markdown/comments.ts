@@ -1,6 +1,15 @@
 import type { InlineComment, DocumentComment, ParsedDocument } from '../../../../shared/types'
 import { nanoid } from 'nanoid'
 
+// Escape/unescape --> in comment bodies to prevent breaking HTML comment syntax
+function escapeCommentBody(body: string): string {
+  return body.replace(/-->/g, '--&gt;')
+}
+
+function unescapeCommentBody(body: string): string {
+  return body.replace(/--&gt;/g, '-->')
+}
+
 const INLINE_COMMENT_RE =
   /<!--\s*@markup\s+(\{[^}]+\})\s*([\s\S]*?)\s*-->/g
 
@@ -66,7 +75,7 @@ export function parseComments(raw: string): ParsedDocument {
         selection: meta.selection,
         author: meta.author || '',
         ts: meta.ts || new Date().toISOString(),
-        body: match[2].trim()
+        body: unescapeCommentBody(match[2].trim())
       })
     } catch {
       // Malformed comment — skip but preserve in file
@@ -87,7 +96,7 @@ export function parseComments(raw: string): ParsedDocument {
           type: 'document',
           author: parsed.author || '',
           ts: parsed.ts || new Date().toISOString(),
-          body: parsed.body || ''
+          body: unescapeCommentBody(parsed.body || '')
         })
       } catch {
         // Malformed line — skip
@@ -176,7 +185,7 @@ export function serializeComments(
       }
       if (comment.selection) meta.selection = comment.selection
 
-      const commentStr = `<!-- @markup ${JSON.stringify(meta)} ${comment.body} -->`
+      const commentStr = `<!-- @markup ${JSON.stringify(meta)} ${escapeCommentBody(comment.body)} -->`
       const existing = insertions.get(insertAt) || []
       existing.push(commentStr)
       insertions.set(insertAt, existing)
@@ -193,7 +202,7 @@ export function serializeComments(
   // Append document-level comments at the end
   if (documentComments.length > 0) {
     const docLines = documentComments.map((c) =>
-      JSON.stringify({ id: c.id, type: 'document', author: c.author, ts: c.ts, body: c.body })
+      JSON.stringify({ id: c.id, type: 'document', author: c.author, ts: c.ts, body: escapeCommentBody(c.body) })
     )
     cleanBody += `\n\n<!-- @markup-doc-comments\n${docLines.join('\n')}\n-->`
   }

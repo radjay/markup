@@ -8,6 +8,7 @@ export interface WorkspaceState {
   folders: string[]
   sidebarMode: SidebarMode
   folderFiles: Map<string, FileEntry[]>
+  folderGitInfo: Map<string, { name: string; branch: string }>
   recentFiles: WatchedFile[]
   viewedFiles: Set<string>
   addFolder: () => Promise<void>
@@ -23,6 +24,7 @@ export function useWorkspace(): WorkspaceState {
   const [folderFiles, setFolderFiles] = useState<Map<string, FileEntry[]>>(new Map())
   const [recentFiles, setRecentFiles] = useState<WatchedFile[]>([])
   const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set())
+  const [folderGitInfo, setFolderGitInfo] = useState<Map<string, { name: string; branch: string }>>(new Map())
 
   const refreshAll = useCallback(async (currentFolders: string[]) => {
     for (const folder of currentFolders) {
@@ -43,6 +45,8 @@ export function useWorkspace(): WorkspaceState {
       setSidebarModeState(settings.sidebarMode)
       setLoaded(true)
       await refreshAll(settings.folders)
+      const gitInfo = await window.electronAPI.getGitInfo()
+      setFolderGitInfo(new Map(Object.entries(gitInfo)))
     })()
   }, [refreshAll])
 
@@ -96,7 +100,7 @@ export function useWorkspace(): WorkspaceState {
   }, [])
 
   return {
-    loaded, folders, sidebarMode, folderFiles, recentFiles, viewedFiles,
+    loaded, folders, sidebarMode, folderFiles, folderGitInfo, recentFiles, viewedFiles,
     addFolder, removeFolder, setSidebarMode, markViewed
   }
 }
