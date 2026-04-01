@@ -12,7 +12,8 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "check": "electron-vite build",
     "dist": "npm run build && electron-builder --mac",
-    "dist:dir": "npm run build && electron-builder --mac --dir"
+    "dist:dir": "npm run build && electron-builder --mac --dir",
+    "install-app": "npm run dist:dir && rm -rf ~/Applications/Markup.app && cp -R release/mac-arm64/Markup.app ~/Applications/Markup.app && echo 'Installed to ~/Applications/Markup.app'"
   },
   "build": {
     "appId": "com.markup.app",

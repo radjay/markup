@@ -573,7 +573,8 @@ kbd {
   border: 1px solid var(--comment-border);
   border-radius: var(--radius);
   margin: 8px 0 16px;
-  overflow: hidden;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .comment-panel-header {

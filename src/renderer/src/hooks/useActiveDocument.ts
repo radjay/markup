@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { parseComments, serializeComments, createInlineComment, createDocumentComment } from '../lib/markdown/comments'
 import type { HeadingEntry } from '../../../shared/types'
 import type { TabManager } from './useTabs'
@@ -22,7 +22,7 @@ export interface ActiveDocumentState {
   dismissExternalChange: () => void
 }
 
-export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
+export function useActiveDocument(tabManager: TabManager, autosave = true): ActiveDocumentState {
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -73,6 +73,21 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
     }
   }, [activeTab, updateActiveTab])
 
+  // Autosave: trigger save shortly after comment mutations
+  const [autosavePending, setAutosavePending] = useState(0)
+  const saveRef = useRef(save)
+  saveRef.current = save
+
+  useEffect(() => {
+    if (!autosave || autosavePending === 0) return
+    const timer = setTimeout(() => saveRef.current(), 300)
+    return () => clearTimeout(timer)
+  }, [autosave, autosavePending])
+
+  const triggerAutosave = useCallback(() => {
+    if (autosave) setAutosavePending((n) => n + 1)
+  }, [autosave])
+
   const modeToggle = useCallback(() => {
     if (!activeTab) return
     if (activeTab.mode === 'edit') {
@@ -98,8 +113,9 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         inlineComments: [...activeTab.inlineComments, createInlineComment(anchor, body, '')],
         hasUnsavedChanges: true, pinned: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const addDocumentComment = useCallback(
@@ -109,8 +125,9 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         documentComments: [...activeTab.documentComments, createDocumentComment(body, '')],
         hasUnsavedChanges: true, pinned: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const editInlineComment = useCallback(
@@ -120,8 +137,9 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         inlineComments: activeTab.inlineComments.map((c) => c.id === id ? { ...c, body } : c),
         hasUnsavedChanges: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const editDocumentComment = useCallback(
@@ -131,24 +149,27 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         documentComments: activeTab.documentComments.map((c) => c.id === id ? { ...c, body } : c),
         hasUnsavedChanges: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const deleteInlineComment = useCallback(
     (id: string) => {
       if (!activeTab) return
       updateActiveTab({ inlineComments: activeTab.inlineComments.filter((c) => c.id !== id), hasUnsavedChanges: true })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const deleteDocumentComment = useCallback(
     (id: string) => {
       if (!activeTab) return
       updateActiveTab({ documentComments: activeTab.documentComments.filter((c) => c.id !== id), hasUnsavedChanges: true })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const reloadFile = useCallback(async () => {

@@ -14,7 +14,7 @@ import { SidebarHeader } from './components/Sidebar/SidebarHeader'
 export default function App() {
   const workspace = useWorkspace()
   const tabManager = useTabs(workspace.markViewed)
-  const doc = useActiveDocument(tabManager)
+  const doc = useActiveDocument(tabManager, workspace.autosave)
   const events = useAppEvents({ workspace, tabManager, doc })
 
   if (!workspace.loaded) return null

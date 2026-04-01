@@ -7,6 +7,7 @@ export interface WorkspaceState {
   loaded: boolean
   folders: string[]
   sidebarMode: SidebarMode
+  autosave: boolean
   folderFiles: Map<string, FileEntry[]>
   folderGitInfo: Map<string, { name: string; branch: string }>
   recentFiles: WatchedFile[]
@@ -23,6 +24,7 @@ export function useWorkspace(): WorkspaceState {
   const [sidebarMode, setSidebarModeState] = useState<SidebarMode>('recent')
   const [folderFiles, setFolderFiles] = useState<Map<string, FileEntry[]>>(new Map())
   const [recentFiles, setRecentFiles] = useState<WatchedFile[]>([])
+  const [autosave, setAutosave] = useState(true)
   const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set())
   const [folderGitInfo, setFolderGitInfo] = useState<Map<string, { name: string; branch: string }>>(new Map())
 
@@ -43,6 +45,7 @@ export function useWorkspace(): WorkspaceState {
       const settings = await window.electronAPI.loadSettings()
       setFolders(settings.folders)
       setSidebarModeState(settings.sidebarMode)
+      setAutosave(settings.autosave ?? true)
       setLoaded(true)
       await refreshAll(settings.folders)
       const gitInfo = await window.electronAPI.getGitInfo()
@@ -86,7 +89,7 @@ export function useWorkspace(): WorkspaceState {
   const setSidebarMode = useCallback(
     async (mode: SidebarMode) => {
       setSidebarModeState(mode)
-      await window.electronAPI.saveSettings({ folders, sidebarMode: mode })
+      await window.electronAPI.saveSettings({ folders, sidebarMode: mode, autosave })
       if (mode === 'recent') {
         const recent = await window.electronAPI.listRecentFiles()
         setRecentFiles(recent)
@@ -100,7 +103,7 @@ export function useWorkspace(): WorkspaceState {
   }, [])
 
   return {
-    loaded, folders, sidebarMode, folderFiles, folderGitInfo, recentFiles, viewedFiles,
+    loaded, folders, sidebarMode, autosave, folderFiles, folderGitInfo, recentFiles, viewedFiles,
     addFolder, removeFolder, setSidebarMode, markViewed
   }
 }
