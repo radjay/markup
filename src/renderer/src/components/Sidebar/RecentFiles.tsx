@@ -40,10 +40,6 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
       {files.map((file) => {
         const isActive = file.path === currentFile
         const isNew = !viewedFiles.has(file.path)
-        const repoLabel = file.repoBranch
-          ? `${file.repoName}:${file.repoBranch}`
-          : file.repoName
-
         return (
           <div
             key={file.path}
@@ -52,11 +48,10 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
             onDoubleClick={() => onDoubleClickFile?.(file.path)}
           >
             <div className="recent-file-info">
-              {isNew && <span className="new-badge" />}
               <div className="recent-file-details">
-                <span className="recent-file-name">{file.name}</span>
+                <span className={`recent-file-name ${isNew ? 'is-new' : ''}`}>{file.name}</span>
                 {file.repoPath && <span className="recent-file-path">/{file.repoPath}</span>}
-                <span className="recent-file-repo">{repoLabel}</span>
+                <span className="recent-file-repo"><span className="repo-name">{file.repoName}</span>{file.repoBranch && <span className="repo-branch">:{file.repoBranch}</span>}</span>
               </div>
             </div>
             <span className="recent-file-time">{relativeTime(file.mtime)}</span>

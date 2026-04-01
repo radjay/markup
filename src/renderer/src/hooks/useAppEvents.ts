@@ -17,8 +17,12 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
 
   const handleSelectFile = useCallback(
     async (path: string) => {
-      const result = await window.electronAPI.readFile(path)
-      tabManager.openFileInTab(result.filePath, result.content, false)
+      try {
+        const result = await window.electronAPI.readFile(path)
+        tabManager.openFileInTab(result.filePath, result.content, false)
+      } catch {
+        window.alert(`File not found:\n${path}`)
+      }
     },
     [tabManager]
   )
@@ -30,8 +34,12 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
         tabManager.updateTab(existingIndex, { pinned: true })
         return
       }
-      const result = await window.electronAPI.readFile(path)
-      tabManager.openFileInTab(result.filePath, result.content, true)
+      try {
+        const result = await window.electronAPI.readFile(path)
+        tabManager.openFileInTab(result.filePath, result.content, true)
+      } catch {
+        window.alert(`File not found:\n${path}`)
+      }
     },
     [tabManager]
   )
@@ -46,6 +54,17 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
     ]
     return () => cleanups.forEach((c) => c())
   }, [handleOpen, workspace, doc])
+
+  // Poll for files opened via CLI / open-file event
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const files = await window.electronAPI.pollPendingFiles()
+      for (const filePath of files) {
+        handlePinFile(filePath)
+      }
+    }, 500)
+    return () => clearInterval(interval)
+  }, [handlePinFile])
 
   // Drag and drop
   useEffect(() => {

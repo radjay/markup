@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { ChevronRight, ChevronDown, FileText } from 'lucide-react'
 import type { FileEntry } from '../../../../shared/types'
 
 interface Props {
   folders: { path: string; files: FileEntry[] }[]
+  gitInfo?: Map<string, { name: string; branch: string }>
   currentFile: string | null
   onSelectFile: (path: string) => void
   onDoubleClickFile?: (path: string) => void
@@ -29,10 +31,10 @@ function FileNode({
       <div className="file-node">
         <div
           className="file-node-row directory"
-          style={{ paddingLeft: `${12 + depth * 16}px` }}
+          style={{ paddingLeft: `${12 + depth * 12}px` }}
           onClick={() => setExpanded(!expanded)}
         >
-          <span className="file-icon">{expanded ? '▾' : '▸'}</span>
+          <span className="file-chevron">{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
           <span className="file-name">{entry.name}</span>
         </div>
         {expanded && entry.children && (
@@ -59,11 +61,11 @@ function FileNode({
     <div className="file-node">
       <div
         className={`file-node-row file ${isActive ? 'active' : ''}`}
-        style={{ paddingLeft: `${12 + depth * 16}px` }}
+        style={{ paddingLeft: `${12 + depth * 12}px` }}
         onClick={() => onSelectFile(entry.path)}
         onDoubleClick={() => onDoubleClickFile?.(entry.path)}
       >
-        <span className="file-icon">📄</span>
+        <span className="file-icon"><FileText size={14} /></span>
         <span className="file-name">{entry.name}</span>
       </div>
     </div>
@@ -73,6 +75,7 @@ function FileNode({
 function FolderRoot({
   folderPath,
   files,
+  branch,
   currentFile,
   onSelectFile,
   onDoubleClickFile,
@@ -80,6 +83,7 @@ function FolderRoot({
 }: {
   folderPath: string
   files: FileEntry[]
+  branch?: string
   currentFile: string | null
   onSelectFile: (path: string) => void
   onDoubleClickFile?: (path: string) => void
@@ -98,8 +102,11 @@ function FolderRoot({
   return (
     <div className="folder-root">
       <div className="folder-root-row" onClick={() => setExpanded(!expanded)}>
-        <span className="file-icon">{expanded ? '▾' : '▸'}</span>
-        <span className="folder-root-name">{displayName}</span>
+        <span className="file-chevron">{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+        <span className="folder-root-name">
+          {displayName}
+          {branch && <span className="folder-branch">{branch}</span>}
+        </span>
         <button className="folder-remove" onClick={handleRemove} title="Remove folder">
           &times;
         </button>
@@ -122,7 +129,7 @@ function FolderRoot({
   )
 }
 
-export function FileTree({ folders, currentFile, onSelectFile, onDoubleClickFile, onRemoveFolder }: Props) {
+export function FileTree({ folders, gitInfo, currentFile, onSelectFile, onDoubleClickFile, onRemoveFolder }: Props) {
   if (folders.length === 0) {
     return <p className="sidebar-empty">No folders added yet.</p>
   }
@@ -134,6 +141,7 @@ export function FileTree({ folders, currentFile, onSelectFile, onDoubleClickFile
           key={path}
           folderPath={path}
           files={files}
+          branch={gitInfo?.get(path)?.branch}
           currentFile={currentFile}
           onSelectFile={onSelectFile}
           onDoubleClickFile={onDoubleClickFile}

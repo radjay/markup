@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { parseComments, serializeComments, createInlineComment, createDocumentComment } from '../lib/markdown/comments'
 import type { HeadingEntry } from '../../../shared/types'
 import type { TabManager } from './useTabs'
@@ -6,11 +6,16 @@ import type { TabManager } from './useTabs'
 export interface ActiveDocumentState {
   headings: HeadingEntry[]
   showExternalChangeBar: boolean
+  saveError: string | null
+  lastAutosaveAt: number | null
+  dismissSaveError: () => void
   save: () => Promise<void>
   modeToggle: () => void
   editChange: (content: string) => void
   addInlineComment: (anchor: string, body: string) => void
   addDocumentComment: (body: string) => void
+  editInlineComment: (id: string, body: string) => void
+  editDocumentComment: (id: string, body: string) => void
   deleteInlineComment: (id: string) => void
   deleteDocumentComment: (id: string) => void
   reloadFile: () => Promise<void>
@@ -18,21 +23,25 @@ export interface ActiveDocumentState {
   dismissExternalChange: () => void
 }
 
-export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
+export function useActiveDocument(tabManager: TabManager, autosave = true): ActiveDocumentState {
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null)
 
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
     const result: HeadingEntry[] = []
+    const idCounts = new Map<string, number>()
     for (const line of activeTab.cleanContent.split('\n')) {
       const match = line.match(/^(#{1,3})\s+(.+)$/)
       if (match) {
         const text = match[2].trim()
-        result.push({
-          level: match[1].length, text,
-          id: text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-        })
+        const baseId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const count = idCounts.get(baseId) || 0
+        idCounts.set(baseId, count + 1)
+        const id = count === 0 ? baseId : `${baseId}-${count}`
+        result.push({ level: match[1].length, text, id })
       }
     }
     return result
@@ -50,6 +59,7 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
 
   const save = useCallback(async () => {
     if (!activeTab) return
+    setSaveError(null)
     try {
       const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
       const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
@@ -59,10 +69,27 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         rawContent: serialized, cleanContent: parsed.content, editContent: parsed.content,
         hasUnsavedChanges: false, pinned: true
       })
+      if (autosave) setLastAutosaveAt(Date.now())
     } catch (err) {
-      console.error('[Markup] Save failed:', err)
+      const msg = err instanceof Error ? err.message : 'Save failed'
+      setSaveError(msg)
     }
   }, [activeTab, updateActiveTab])
+
+  // Autosave: trigger save shortly after comment mutations
+  const [autosavePending, setAutosavePending] = useState(0)
+  const saveRef = useRef(save)
+  saveRef.current = save
+
+  useEffect(() => {
+    if (!autosave || autosavePending === 0) return
+    const timer = setTimeout(() => saveRef.current(), 300)
+    return () => clearTimeout(timer)
+  }, [autosave, autosavePending])
+
+  const triggerAutosave = useCallback(() => {
+    if (autosave) setAutosavePending((n) => n + 1)
+  }, [autosave])
 
   const modeToggle = useCallback(() => {
     if (!activeTab) return
@@ -89,8 +116,9 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         inlineComments: [...activeTab.inlineComments, createInlineComment(anchor, body, '')],
         hasUnsavedChanges: true, pinned: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const addDocumentComment = useCallback(
@@ -100,24 +128,51 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
         documentComments: [...activeTab.documentComments, createDocumentComment(body, '')],
         hasUnsavedChanges: true, pinned: true
       })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
+  )
+
+  const editInlineComment = useCallback(
+    (id: string, body: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        inlineComments: activeTab.inlineComments.map((c) => c.id === id ? { ...c, body } : c),
+        hasUnsavedChanges: true
+      })
+      triggerAutosave()
+    },
+    [activeTab, updateActiveTab, triggerAutosave]
+  )
+
+  const editDocumentComment = useCallback(
+    (id: string, body: string) => {
+      if (!activeTab) return
+      updateActiveTab({
+        documentComments: activeTab.documentComments.map((c) => c.id === id ? { ...c, body } : c),
+        hasUnsavedChanges: true
+      })
+      triggerAutosave()
+    },
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const deleteInlineComment = useCallback(
     (id: string) => {
       if (!activeTab) return
       updateActiveTab({ inlineComments: activeTab.inlineComments.filter((c) => c.id !== id), hasUnsavedChanges: true })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const deleteDocumentComment = useCallback(
     (id: string) => {
       if (!activeTab) return
       updateActiveTab({ documentComments: activeTab.documentComments.filter((c) => c.id !== id), hasUnsavedChanges: true })
+      triggerAutosave()
     },
-    [activeTab, updateActiveTab]
+    [activeTab, updateActiveTab, triggerAutosave]
   )
 
   const reloadFile = useCallback(async () => {
@@ -132,20 +187,49 @@ export function useActiveDocument(tabManager: TabManager): ActiveDocumentState {
   }, [activeTab, updateActiveTab])
 
   const scrollToHeading = useCallback((id: string) => {
-    const els = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
-    for (const el of els) {
-      const text = el.textContent || ''
-      const elId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-      if (elId === id) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break }
+    if (activeTab?.mode === 'edit') {
+      // In edit mode, find the heading line in markdown content and scroll CodeMirror
+      const content = activeTab.editContent || activeTab.cleanContent
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^#{1,3}\s+(.+)$/)
+        if (match) {
+          const lineId = match[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+          if (lineId === id) {
+            const cmLine = document.querySelector(`.cm-editor .cm-line:nth-child(${i + 1})`)
+            if (cmLine) {
+              cmLine.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            } else {
+              // Fallback: scroll editor pane by estimated line height
+              const editorPane = document.querySelector('.editor-pane')
+              if (editorPane) editorPane.scrollTop = i * 22
+            }
+            break
+          }
+        }
+      }
+    } else {
+      // In review mode, find the rendered heading element (with duplicate disambiguation)
+      const els = document.querySelectorAll('.review-mode h1, .review-mode h2, .review-mode h3')
+      const elIdCounts = new Map<string, number>()
+      for (const el of els) {
+        const text = el.textContent || ''
+        const baseId = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const count = elIdCounts.get(baseId) || 0
+        elIdCounts.set(baseId, count + 1)
+        const elId = count === 0 ? baseId : `${baseId}-${count}`
+        if (elId === id) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break }
+      }
     }
-  }, [])
+  }, [activeTab])
 
   const dismissExternalChange = useCallback(() => setShowExternalChangeBar(false), [])
+  const dismissSaveError = useCallback(() => setSaveError(null), [])
 
   return {
-    headings, showExternalChangeBar,
+    headings, showExternalChangeBar, saveError, lastAutosaveAt, dismissSaveError,
     save, modeToggle, editChange,
-    addInlineComment, addDocumentComment, deleteInlineComment, deleteDocumentComment,
+    addInlineComment, addDocumentComment, editInlineComment, editDocumentComment, deleteInlineComment, deleteDocumentComment,
     reloadFile, scrollToHeading, dismissExternalChange
   }
 }

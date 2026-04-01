@@ -13,13 +13,13 @@ export function Outline({ headings, onClickHeading }: Props) {
 
   return (
     <div className="outline">
-      <div
-        className="outline-header"
+      <h3
+        className="panel-title"
+        style={{ cursor: 'pointer' }}
         onClick={() => setExpanded(!expanded)}
       >
-        <span className="outline-toggle">{expanded ? '▾' : '▸'}</span>
-        <h4 className="panel-title" style={{ marginBottom: 0 }}>Document Outline</h4>
-      </div>
+        Document Outline
+      </h3>
       {expanded && (
         <div className="outline-list">
           {headings.map((h) => (

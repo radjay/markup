@@ -54,6 +54,7 @@ export interface HeadingEntry {
 export interface WorkspaceSettings {
   folders: string[]
   sidebarMode: 'tree' | 'recent'
+  autosave: boolean
 }
 
 export interface WatchedFile {

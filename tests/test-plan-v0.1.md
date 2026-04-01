@@ -1,8 +1,10 @@
 ---
-title: Markup v0.1 Manual Test Plan
-date: 2026-03-29
+title: "Markup v0.1 Manual Test Plan"
+date: "2026-03-29"
+markup_reviewed: true
+markup_reviewed_at: "2026-03-29T18:23:19.570Z"
+markup_status: "changes_requested"
 ---
-
 # Markup v0.1 — Manual Test Plan
 
 ## Prerequisites
@@ -14,9 +16,10 @@ date: 2026-03-29
 ## Test Fixtures
 
 Create these files in a test directory before starting:
+<!-- @markup {"id":"dLSsl9LyBReiktZ8L1rDJ","type":"inline","anchor":"p:Create these files in a test directory before starting:","author":"","ts":"2026-03-29T18:22:54.267Z"} We don't need to create these, they've been added to the repo in tests/fixtures/ -->
 
 1. **basic.md** — Simple markdown with headings, paragraphs, a list, code block, table, and blockquote. No frontmatter, no existing comments.
-2. **with-comments.md** — Contains `<!-- @markup {...} -->` inline comments and `<!-- @markup-doc-comments -->` block, plus frontmatter with `markup_reviewed: true` and `markup_status: changes_requested`.
+2. **with-comments.md** — Contains `` inline comments and `<!-- @markup-doc-comments -->` block, plus frontmatter with `markup_reviewed: true` and `markup_status: changes_requested`.
 3. **empty.md** — Zero-byte file.
 4. **frontmatter-only.md** — Only YAML frontmatter, no body.
 5. **huge.md** — 10,000+ lines (repeated heading/paragraph blocks).

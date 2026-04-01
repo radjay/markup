@@ -14,7 +14,7 @@ import { SidebarHeader } from './components/Sidebar/SidebarHeader'
 export default function App() {
   const workspace = useWorkspace()
   const tabManager = useTabs(workspace.markViewed)
-  const doc = useActiveDocument(tabManager)
+  const doc = useActiveDocument(tabManager, workspace.autosave)
   const events = useAppEvents({ workspace, tabManager, doc })
 
   if (!workspace.loaded) return null
@@ -43,6 +43,7 @@ export default function App() {
             {workspace.sidebarMode === 'tree' ? (
               <FileTree
                 folders={folderEntries}
+                gitInfo={workspace.folderGitInfo}
                 currentFile={tabManager.activeTab?.filePath || null}
                 onSelectFile={events.handleSelectFile}
                 onDoubleClickFile={events.handlePinFile}
@@ -61,11 +62,25 @@ export default function App() {
         </aside>
 
         <div className="editor-area">
-          <TabBar tabManager={tabManager} doc={doc} />
+          <TabBar tabManager={tabManager} doc={doc} autosave={workspace.autosave} />
           {doc.showExternalChangeBar && (
-            <ExternalChangeBar onReload={doc.reloadFile} onDismiss={doc.dismissExternalChange} />
+            <ExternalChangeBar
+              hasUnsavedChanges={tabManager.activeTab?.hasUnsavedChanges ?? false}
+              onReload={doc.reloadFile}
+              onDismiss={doc.dismissExternalChange}
+            />
           )}
-          <EditorPane activeTab={tabManager.activeTab} doc={doc} />
+          {doc.saveError && (
+            <div className="save-error-bar">
+              <span>Save failed: {doc.saveError}</span>
+              <button onClick={doc.dismissSaveError}>Dismiss</button>
+            </div>
+          )}
+          <EditorPane
+            activeTab={tabManager.activeTab}
+            doc={doc}
+            onScrollChange={(scrollTop) => tabManager.updateActiveTab({ scrollTop })}
+          />
         </div>
 
         {tabManager.activeTab && <RightPanel activeTab={tabManager.activeTab} doc={doc} />}

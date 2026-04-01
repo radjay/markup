@@ -10,8 +10,10 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "check": "electron-vite build",
     "dist": "npm run build && electron-builder --mac",
-    "dist:dir": "npm run build && electron-builder --mac --dir"
+    "dist:dir": "npm run build && electron-builder --mac --dir",
+    "install-app": "osascript -e 'tell application \"Markup\" to quit' 2>/dev/null; sleep 1; npm run dist:dir && rm -rf ~/Applications/Markup.app && cp -R release/mac-arm64/Markup.app ~/Applications/Markup.app && echo 'Installed to ~/Applications/Markup.app'"
   },
   "build": {
     "appId": "com.markup.app",
@@ -44,6 +46,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "chokidar": "^5.0.0",
     "codemirror": "^6.0.2",
+    "lucide-react": "^1.7.0",
     "nanoid": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

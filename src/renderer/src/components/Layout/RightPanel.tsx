@@ -14,6 +14,7 @@ export function RightPanel({ activeTab, doc }: Props) {
       <DocumentComments
         comments={activeTab.documentComments}
         onAdd={doc.addDocumentComment}
+        onEdit={doc.editDocumentComment}
         onDelete={doc.deleteDocumentComment}
       />
       <Outline headings={doc.headings} onClickHeading={doc.scrollToHeading} />

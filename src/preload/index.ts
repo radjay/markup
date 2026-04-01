@@ -25,6 +25,8 @@ const api = {
   removeFolder: (folder: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.REMOVE_FOLDER, folder),
   listRecentFiles: (): Promise<WatchedFile[]> => ipcRenderer.invoke(IPC.LIST_RECENT_FILES),
+  getGitInfo: (): Promise<Record<string, { name: string; branch: string }>> =>
+    ipcRenderer.invoke('folder:gitInfo'),
 
   // Events
   onFileChanged: (callback: (filePath: string) => void) => {
@@ -60,6 +62,9 @@ const api = {
     ipcRenderer.on('menu:toggleMode', callback)
     return () => ipcRenderer.removeListener('menu:toggleMode', callback)
   },
+
+  // CLI: poll for files opened via command line or open-file event
+  pollPendingFiles: (): Promise<string[]> => ipcRenderer.invoke('cli:pendingFiles'),
 
   // Drag and drop
   handleDrop: (filePath: string): Promise<{ type: 'file'; filePath: string; content: string } | { type: 'directory'; dirPath: string } | null> =>

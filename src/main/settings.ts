@@ -5,11 +5,12 @@ import { readFile, writeFile } from 'fs/promises'
 export interface Settings {
   folders: string[]
   sidebarMode: 'tree' | 'recent'
+  autosave: boolean
 }
 
 const SETTINGS_PATH = join(app.getPath('userData'), 'markup-settings.json')
 
-const defaults: Settings = { folders: [], sidebarMode: 'recent' }
+const defaults: Settings = { folders: [], sidebarMode: 'recent', autosave: true }
 
 export async function loadSettings(): Promise<Settings> {
   try {
