@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect } from 'react'
 import { ReviewMode } from '../Editor/ReviewMode'
 import { EditMode } from '../Editor/EditMode'
 import type { Tab } from '../../hooks/useTabs'
@@ -13,6 +13,7 @@ interface Props {
 export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
   const paneRef = useRef<HTMLDivElement>(null)
   const lastFileRef = useRef<string | null>(null)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Restore scroll position when switching to a tab
   useEffect(() => {
@@ -21,12 +22,24 @@ export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
       paneRef.current.scrollTop = activeTab.scrollTop
       lastFileRef.current = activeTab.filePath
     }
-  }, [activeTab])
+  }, [activeTab?.filePath, activeTab?.scrollTop])
 
-  // Save scroll position on scroll
-  const handleScroll = useCallback(() => {
-    if (paneRef.current && onScrollChange) {
-      onScrollChange(paneRef.current.scrollTop)
+  // Save scroll position — debounced to avoid re-render storms
+  useEffect(() => {
+    const pane = paneRef.current
+    if (!pane || !onScrollChange) return
+
+    const handleScroll = () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = setTimeout(() => {
+        if (pane) onScrollChange(pane.scrollTop)
+      }, 500)
+    }
+
+    pane.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      pane.removeEventListener('scroll', handleScroll)
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
     }
   }, [onScrollChange])
 
@@ -41,7 +54,7 @@ export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
   }
 
   return (
-    <div className="editor-pane" ref={paneRef} onScroll={handleScroll}>
+    <div className="editor-pane" ref={paneRef}>
       {activeTab.mode === 'review' ? (
         <ReviewMode
           key={activeTab.filePath}

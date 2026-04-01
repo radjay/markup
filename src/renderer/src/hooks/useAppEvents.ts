@@ -44,17 +44,27 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
     [tabManager]
   )
 
-  // Menu events + CLI open
+  // Menu events
   useEffect(() => {
     const cleanups = [
       window.electronAPI.onMenuOpenFile(() => handleOpen()),
       window.electronAPI.onMenuAddFolder(() => workspace.addFolder()),
       window.electronAPI.onMenuSave(() => doc.save()),
-      window.electronAPI.onMenuToggleMode(() => doc.modeToggle()),
-      window.electronAPI.onCliOpenFile((filePath: string) => handlePinFile(filePath))
+      window.electronAPI.onMenuToggleMode(() => doc.modeToggle())
     ]
     return () => cleanups.forEach((c) => c())
-  }, [handleOpen, handlePinFile, workspace, doc])
+  }, [handleOpen, workspace, doc])
+
+  // Poll for files opened via CLI / open-file event
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const files = await window.electronAPI.pollPendingFiles()
+      for (const filePath of files) {
+        handlePinFile(filePath)
+      }
+    }, 500)
+    return () => clearInterval(interval)
+  }, [handlePinFile])
 
   // Drag and drop
   useEffect(() => {

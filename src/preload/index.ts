@@ -63,12 +63,8 @@ const api = {
     return () => ipcRenderer.removeListener('menu:toggleMode', callback)
   },
 
-  // CLI: open file from command line
-  onCliOpenFile: (callback: (filePath: string) => void) => {
-    const handler = (_event: unknown, filePath: string) => callback(filePath)
-    ipcRenderer.on('cli:openFile', handler)
-    return () => ipcRenderer.removeListener('cli:openFile', handler)
-  },
+  // CLI: poll for files opened via command line or open-file event
+  pollPendingFiles: (): Promise<string[]> => ipcRenderer.invoke('cli:pendingFiles'),
 
   // Drag and drop
   handleDrop: (filePath: string): Promise<{ type: 'file'; filePath: string; content: string } | { type: 'directory'; dirPath: string } | null> =>

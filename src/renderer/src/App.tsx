@@ -62,7 +62,7 @@ export default function App() {
         </aside>
 
         <div className="editor-area">
-          <TabBar tabManager={tabManager} doc={doc} />
+          <TabBar tabManager={tabManager} doc={doc} autosave={workspace.autosave} />
           {doc.showExternalChangeBar && (
             <ExternalChangeBar
               hasUnsavedChanges={tabManager.activeTab?.hasUnsavedChanges ?? false}

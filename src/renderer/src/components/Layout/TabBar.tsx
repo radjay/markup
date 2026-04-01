@@ -1,12 +1,31 @@
+import { useState, useEffect } from 'react'
 import type { TabManager } from '../../hooks/useTabs'
 import type { ActiveDocumentState } from '../../hooks/useActiveDocument'
 
 interface Props {
   tabManager: TabManager
   doc: ActiveDocumentState
+  autosave: boolean
 }
 
-export function TabBar({ tabManager, doc }: Props) {
+function AutosaveIndicator({ lastAutosaveAt }: { lastAutosaveAt: number | null }) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!lastAutosaveAt) return
+    setVisible(true)
+    const timer = setTimeout(() => setVisible(false), 3000)
+    return () => clearTimeout(timer)
+  }, [lastAutosaveAt])
+
+  return (
+    <span className={`autosave-indicator ${visible ? 'visible' : ''}`}>
+      Autosaved
+    </span>
+  )
+}
+
+export function TabBar({ tabManager, doc, autosave }: Props) {
   const { tabs, activeTabIndex, activeTab, clickTab, closeTab } = tabManager
 
   if (tabs.length === 0) return null
@@ -50,14 +69,18 @@ export function TabBar({ tabManager, doc }: Props) {
               Edit
             </button>
           </div>
-          <button
-            onClick={doc.save}
-            className="titlebar-button save-button"
-            disabled={!activeTab.hasUnsavedChanges}
-            title="Save (Cmd+S)"
-          >
-            Save
-          </button>
+          {autosave ? (
+            <AutosaveIndicator lastAutosaveAt={doc.lastAutosaveAt} />
+          ) : (
+            <button
+              onClick={doc.save}
+              className="titlebar-button save-button"
+              disabled={!activeTab.hasUnsavedChanges}
+              title="Save (Cmd+S)"
+            >
+              Save
+            </button>
+          )}
         </div>
       )}
     </div>

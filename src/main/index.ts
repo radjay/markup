@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
 import { join, extname, basename } from 'path'
 import { readFile, writeFile, readdir } from 'fs/promises'
 import { is } from '@electron-toolkit/utils'
@@ -28,6 +28,19 @@ function createWindow(): BrowserWindow {
   // Share the window reference with folder-watcher so it can send IPC events
   // (same pattern as menu events which use mainWindow?.webContents.send)
   setWatcherWindow(mainWindow)
+
+  // Open external links in system browser, not in the Electron window
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Allow dev server reloads, block everything else
+    if (!url.startsWith('http://localhost')) {
+      event.preventDefault()
+      shell.openExternal(url)
+    }
+  })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -349,14 +362,30 @@ ipcMain.handle('drop:file', async (_event, filePath: string) => {
 
 // ---- CLI: open file from command line ----
 
-function openFileFromPath(filePath: string): void {
-  if (!mainWindow) return
+const pendingFileOpens: string[] = []
+
+function queueFileOpen(filePath: string): void {
   const absPath = filePath.startsWith('/') ? filePath : join(process.cwd(), filePath)
   const ext = extname(absPath).toLowerCase()
   if (ext !== '.md' && ext !== '.markdown') return
-  mainWindow.webContents.send('cli:openFile', absPath)
-  mainWindow.focus()
+  pendingFileOpens.push(absPath)
 }
+
+ipcMain.handle('cli:pendingFiles', async () => {
+  return pendingFileOpens.splice(0)
+})
+
+// macOS: open-file event fires when files are opened via "open -a" or dropped on dock icon.
+// MUST be registered before app.whenReady() to catch events during launch.
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  queueFileOpen(filePath)
+  // If app is already running, bring window to front
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
 
 // Single instance lock — second launch sends argv to the running instance
 const gotTheLock = app.requestSingleInstanceLock()
@@ -365,26 +394,14 @@ if (!gotTheLock) {
   app.quit()
 } else {
   app.on('second-instance', (_event, argv) => {
-    // On macOS, files come via open-file event. On other platforms, check argv.
     const filePath = argv.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
-    if (filePath) openFileFromPath(filePath)
+    if (filePath) queueFileOpen(filePath)
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
   })
 }
-
-// macOS: open-file event fires when files are dropped on dock icon or opened via "open" command
-app.on('open-file', (event, filePath) => {
-  event.preventDefault()
-  if (app.isReady() && mainWindow) {
-    openFileFromPath(filePath)
-  } else {
-    // App not ready yet — defer until window is created
-    app.whenReady().then(() => openFileFromPath(filePath))
-  }
-})
 
 // ---- App lifecycle ----
 
@@ -397,11 +414,9 @@ app.whenReady().then(() => {
   buildMenu()
   createWindow()
 
-  // Open files passed via command line arguments
+  // Open files passed via command line arguments (direct electron invocation)
   const fileArg = process.argv.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
-  if (fileArg) {
-    mainWindow?.webContents.once('did-finish-load', () => openFileFromPath(fileArg))
-  }
+  if (fileArg) queueFileOpen(fileArg)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

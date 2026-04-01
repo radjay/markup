@@ -232,6 +232,19 @@ kbd {
   cursor: default;
 }
 
+.autosave-indicator {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.autosave-indicator.visible {
+  opacity: 1;
+  color: var(--success);
+}
+
 /* ---- Main Content ---- */
 
 .main-content {
@@ -573,8 +586,6 @@ kbd {
   border: 1px solid var(--comment-border);
   border-radius: var(--radius);
   margin: 8px 0 16px;
-  max-height: 50vh;
-  overflow-y: auto;
 }
 
 .comment-panel-header {

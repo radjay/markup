@@ -7,6 +7,7 @@ export interface ActiveDocumentState {
   headings: HeadingEntry[]
   showExternalChangeBar: boolean
   saveError: string | null
+  lastAutosaveAt: number | null
   dismissSaveError: () => void
   save: () => Promise<void>
   modeToggle: () => void
@@ -26,6 +27,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true): Acti
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null)
 
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
@@ -67,6 +69,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true): Acti
         rawContent: serialized, cleanContent: parsed.content, editContent: parsed.content,
         hasUnsavedChanges: false, pinned: true
       })
+      if (autosave) setLastAutosaveAt(Date.now())
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Save failed'
       setSaveError(msg)
@@ -224,7 +227,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true): Acti
   const dismissSaveError = useCallback(() => setSaveError(null), [])
 
   return {
-    headings, showExternalChangeBar, saveError, dismissSaveError,
+    headings, showExternalChangeBar, saveError, lastAutosaveAt, dismissSaveError,
     save, modeToggle, editChange,
     addInlineComment, addDocumentComment, editInlineComment, editDocumentComment, deleteInlineComment, deleteDocumentComment,
     reloadFile, scrollToHeading, dismissExternalChange
