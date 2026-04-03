@@ -62,6 +62,14 @@ const api = {
     ipcRenderer.on('menu:toggleMode', callback)
     return () => ipcRenderer.removeListener('menu:toggleMode', callback)
   },
+  onMenuOpenSettings: (callback: () => void) => {
+    ipcRenderer.on('menu:openSettings', callback)
+    return () => ipcRenderer.removeListener('menu:openSettings', callback)
+  },
+
+  // App icon switching
+  setAppIcon: (variant: 'light' | 'dark'): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.SET_APP_ICON, variant),
 
   // CLI: poll for files opened via command line or open-file event
   pollPendingFiles: (): Promise<string[]> => ipcRenderer.invoke('cli:pendingFiles'),

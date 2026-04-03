@@ -37,6 +37,7 @@ export function TabBar({ tabManager, doc, autosave }: Props) {
           <div
             key={tab.filePath}
             className={`tab ${i === activeTabIndex ? 'active' : ''} ${!tab.pinned ? 'preview' : ''}`}
+            title={tab.filePath}
             onClick={() => clickTab(i)}
           >
             <span className="tab-name">{tab.fileName}</span>
@@ -55,20 +56,6 @@ export function TabBar({ tabManager, doc, autosave }: Props) {
       </div>
       {activeTab && (
         <div className="tab-bar-right">
-          <div className="mode-toggle">
-            <button
-              className={`mode-button ${activeTab.mode === 'review' ? 'active' : ''}`}
-              onClick={() => activeTab.mode !== 'review' && doc.modeToggle()}
-            >
-              Review
-            </button>
-            <button
-              className={`mode-button ${activeTab.mode === 'edit' ? 'active' : ''}`}
-              onClick={() => activeTab.mode !== 'edit' && doc.modeToggle()}
-            >
-              Edit
-            </button>
-          </div>
           {autosave ? (
             <AutosaveIndicator lastAutosaveAt={doc.lastAutosaveAt} />
           ) : (

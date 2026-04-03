@@ -9,8 +9,13 @@ import { startWatching, stopAllWatching, listRecentFiles, setWatcherWindow, mark
 
 let mainWindow: BrowserWindow | null = null
 
+function getIconPath(variant: 'light' | 'dark' = 'light'): string {
+  const iconFile = variant === 'dark' ? 'app-icon-dark.png' : 'app-icon.png'
+  return join(__dirname, '../../assets', iconFile)
+}
+
 function createWindow(): BrowserWindow {
-  const iconPath = join(__dirname, '../../assets/app-icon.png')
+  const iconPath = getIconPath(currentSettings.appIcon)
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -211,7 +216,16 @@ ipcMain.handle(IPC.UNWATCH_FILE, async () => true)
 
 // ---- Settings & Folder Management ----
 
-let currentSettings: Settings = { folders: [], sidebarMode: 'recent' }
+let currentSettings: Settings = {
+  folders: [],
+  sidebarMode: 'recent',
+  autosave: true,
+  appIcon: 'light',
+  defaultMode: 'review',
+  fontSize: 15,
+  authorName: '',
+  rightPanelOpen: false
+}
 
 ipcMain.handle(IPC.SETTINGS_LOAD, async () => {
   currentSettings = await loadSettings()
@@ -257,6 +271,17 @@ ipcMain.handle('folder:gitInfo', async () => {
   return getGitInfoForFolders(currentSettings.folders)
 })
 
+ipcMain.handle(IPC.SET_APP_ICON, async (_event, variant: 'light' | 'dark') => {
+  const iconFile = variant === 'dark' ? 'app-icon-dark.png' : 'app-icon.png'
+  const iconPath = join(__dirname, '../../assets', iconFile)
+  const icon = nativeImage.createFromPath(iconPath)
+  if (process.platform === 'darwin') {
+    app.dock.setIcon(icon)
+  }
+  mainWindow?.setIcon(icon)
+  return true
+})
+
 // ---- Native Menus ----
 
 function buildMenu(): void {
@@ -265,6 +290,12 @@ function buildMenu(): void {
       label: app.name,
       submenu: [
         { role: 'about' },
+        { type: 'separator' },
+        {
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => mainWindow?.webContents.send('menu:openSettings')
+        },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -405,9 +436,12 @@ if (!gotTheLock) {
 
 // ---- App lifecycle ----
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Load settings before creating window so icon preference is applied immediately
+  currentSettings = await loadSettings()
+
   if (process.platform === 'darwin') {
-    const dockIcon = nativeImage.createFromPath(join(__dirname, '../../assets/app-icon.png'))
+    const dockIcon = nativeImage.createFromPath(getIconPath(currentSettings.appIcon))
     app.dock.setIcon(dockIcon)
   }
 

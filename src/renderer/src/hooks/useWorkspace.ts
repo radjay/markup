@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { FileEntry, WatchedFile } from '../../../shared/types'
+import type { FileEntry, WatchedFile, WorkspaceSettings } from '../../../shared/types'
 
 export type SidebarMode = 'tree' | 'recent'
 
@@ -8,6 +8,7 @@ export interface WorkspaceState {
   folders: string[]
   sidebarMode: SidebarMode
   autosave: boolean
+  allSettings: WorkspaceSettings
   folderFiles: Map<string, FileEntry[]>
   folderGitInfo: Map<string, { name: string; branch: string }>
   recentFiles: WatchedFile[]
@@ -15,6 +16,7 @@ export interface WorkspaceState {
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   setSidebarMode: (mode: SidebarMode) => Promise<void>
+  reloadSettings: (settings: WorkspaceSettings) => void
   markViewed: (filePath: string) => void
 }
 
@@ -27,6 +29,16 @@ export function useWorkspace(): WorkspaceState {
   const [autosave, setAutosave] = useState(true)
   const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set())
   const [folderGitInfo, setFolderGitInfo] = useState<Map<string, { name: string; branch: string }>>(new Map())
+  const [allSettings, setAllSettings] = useState<WorkspaceSettings>({
+    folders: [],
+    sidebarMode: 'recent',
+    autosave: true,
+    appIcon: 'light',
+    defaultMode: 'review',
+    fontSize: 15,
+    authorName: '',
+    rightPanelOpen: false
+  })
 
   const refreshAll = useCallback(async (currentFolders: string[]) => {
     for (const folder of currentFolders) {
@@ -46,6 +58,7 @@ export function useWorkspace(): WorkspaceState {
       setFolders(settings.folders)
       setSidebarModeState(settings.sidebarMode)
       setAutosave(settings.autosave ?? true)
+      setAllSettings(settings)
       setLoaded(true)
       await refreshAll(settings.folders)
       const gitInfo = await window.electronAPI.getGitInfo()
@@ -89,21 +102,30 @@ export function useWorkspace(): WorkspaceState {
   const setSidebarMode = useCallback(
     async (mode: SidebarMode) => {
       setSidebarModeState(mode)
-      await window.electronAPI.saveSettings({ folders, sidebarMode: mode, autosave })
+      const updated = { ...allSettings, folders, sidebarMode: mode, autosave }
+      setAllSettings(updated)
+      await window.electronAPI.saveSettings(updated)
       if (mode === 'recent') {
         const recent = await window.electronAPI.listRecentFiles()
         setRecentFiles(recent)
       }
     },
-    [folders]
+    [folders, autosave, allSettings]
   )
+
+  const reloadSettings = useCallback((settings: WorkspaceSettings) => {
+    setAllSettings(settings)
+    setFolders(settings.folders)
+    setSidebarModeState(settings.sidebarMode)
+    setAutosave(settings.autosave ?? true)
+  }, [])
 
   const markViewed = useCallback((filePath: string) => {
     setViewedFiles((prev) => new Set(prev).add(filePath))
   }, [])
 
   return {
-    loaded, folders, sidebarMode, autosave, folderFiles, folderGitInfo, recentFiles, viewedFiles,
-    addFolder, removeFolder, setSidebarMode, markViewed
+    loaded, folders, sidebarMode, autosave, allSettings, folderFiles, folderGitInfo, recentFiles, viewedFiles,
+    addFolder, removeFolder, setSidebarMode, reloadSettings, markViewed
   }
 }

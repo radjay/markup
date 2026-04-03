@@ -9,18 +9,48 @@ interface Props {
   onDoubleClickFile?: (path: string) => void
 }
 
-function relativeTime(mtime: number): string {
-  const diff = Date.now() - mtime
-  const seconds = Math.floor(diff / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days}d ago`
-  return new Date(mtime).toLocaleDateString()
+interface DateBucket {
+  label: string
+  files: WatchedFile[]
+}
+
+function bucketByDate(files: WatchedFile[]): DateBucket[] {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterdayStart = todayStart - 86400000
+
+  // Monday of this week
+  const dayOfWeek = now.getDay()
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const weekStart = todayStart - daysSinceMonday * 86400000
+
+  // 1st of this month
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+
+  const buckets: DateBucket[] = [
+    { label: 'Today', files: [] },
+    { label: 'Yesterday', files: [] },
+    { label: 'This Week', files: [] },
+    { label: 'This Month', files: [] },
+    { label: 'Older', files: [] }
+  ]
+
+  for (const file of files) {
+    const t = file.mtime
+    if (t >= todayStart) {
+      buckets[0].files.push(file)
+    } else if (t >= yesterdayStart) {
+      buckets[1].files.push(file)
+    } else if (t >= weekStart) {
+      buckets[2].files.push(file)
+    } else if (t >= monthStart) {
+      buckets[3].files.push(file)
+    } else {
+      buckets[4].files.push(file)
+    }
+  }
+
+  return buckets.filter((b) => b.files.length > 0)
 }
 
 export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onDoubleClickFile }: Props) {
@@ -35,29 +65,36 @@ export function RecentFiles({ files, currentFile, viewedFiles, onSelectFile, onD
     return <p className="sidebar-empty">No markdown files found.</p>
   }
 
+  const buckets = bucketByDate(files)
+
   return (
     <div className="recent-files">
-      {files.map((file) => {
-        const isActive = file.path === currentFile
-        const isNew = !viewedFiles.has(file.path)
-        return (
-          <div
-            key={file.path}
-            className={`recent-file-row ${isActive ? 'active' : ''}`}
-            onClick={() => onSelectFile(file.path)}
-            onDoubleClick={() => onDoubleClickFile?.(file.path)}
-          >
-            <div className="recent-file-info">
-              <div className="recent-file-details">
-                <span className={`recent-file-name ${isNew ? 'is-new' : ''}`}>{file.name}</span>
-                {file.repoPath && <span className="recent-file-path">/{file.repoPath}</span>}
-                <span className="recent-file-repo"><span className="repo-name">{file.repoName}</span>{file.repoBranch && <span className="repo-branch">:{file.repoBranch}</span>}</span>
+      {buckets.map((bucket) => (
+        <div key={bucket.label} className="recent-group">
+          <div className="recent-group-header">{bucket.label}</div>
+          {bucket.files.map((file) => {
+            const isActive = file.path === currentFile
+            const isNew = !viewedFiles.has(file.path)
+            return (
+              <div
+                key={file.path}
+                className={`recent-file-row ${isActive ? 'active' : ''}`}
+                title={file.path}
+                onClick={() => onSelectFile(file.path)}
+                onDoubleClick={() => onDoubleClickFile?.(file.path)}
+              >
+                <div className="recent-file-info">
+                  <div className="recent-file-details">
+                    <span className={`recent-file-name ${isNew ? 'is-new' : ''}`}>{file.name}</span>
+                    {file.repoPath && <span className="recent-file-path">/{file.repoPath}</span>}
+                    <span className="recent-file-repo"><span className="repo-name">{file.repoName}</span>{file.repoBranch && <span className="repo-branch">:{file.repoBranch}</span>}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <span className="recent-file-time">{relativeTime(file.mtime)}</span>
-          </div>
-        )
-      })}
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }

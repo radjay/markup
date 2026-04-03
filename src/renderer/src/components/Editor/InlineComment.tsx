@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Pencil } from 'lucide-react'
 import type { InlineComment as InlineCommentType } from '../../../../shared/types'
 
@@ -15,10 +15,24 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
   const [text, setText] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const mountedRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (!editingId) inputRef.current?.focus()
+    // Only focus on initial mount, not on re-renders (which would scroll back)
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      inputRef.current?.focus({ preventScroll: true })
+    }
+  }, [])
+
+  // Refocus when exiting edit mode
+  const prevEditingRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevEditingRef.current && !editingId) {
+      inputRef.current?.focus({ preventScroll: true })
+    }
+    prevEditingRef.current = editingId
   }, [editingId])
 
   const handleSubmit = () => {
@@ -108,7 +122,9 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
                     onChange={(e) => setEditText(e.target.value)}
                     onKeyDown={handleEditKeyDown}
                     rows={2}
-                    autoFocus
+                    ref={useCallback((el: HTMLTextAreaElement | null) => {
+                      el?.focus({ preventScroll: true })
+                    }, [])}
                   />
                   <div className="comment-edit-actions">
                     <button onClick={cancelEdit} className="comment-edit-cancel">Cancel</button>
