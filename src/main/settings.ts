@@ -6,11 +6,25 @@ export interface Settings {
   folders: string[]
   sidebarMode: 'tree' | 'recent'
   autosave: boolean
+  appIcon: 'light' | 'dark'
+  defaultMode: 'review' | 'edit'
+  fontSize: number
+  authorName: string
+  rightPanelOpen: boolean
 }
 
 const SETTINGS_PATH = join(app.getPath('userData'), 'markup-settings.json')
 
-const defaults: Settings = { folders: [], sidebarMode: 'recent', autosave: true }
+const defaults: Settings = {
+  folders: [],
+  sidebarMode: 'recent',
+  autosave: true,
+  appIcon: 'light',
+  defaultMode: 'review',
+  fontSize: 15,
+  authorName: '',
+  rightPanelOpen: false
+}
 
 export async function loadSettings(): Promise<Settings> {
   try {

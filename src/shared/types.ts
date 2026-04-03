@@ -55,6 +55,11 @@ export interface WorkspaceSettings {
   folders: string[]
   sidebarMode: 'tree' | 'recent'
   autosave: boolean
+  appIcon: 'light' | 'dark'
+  defaultMode: 'review' | 'edit'
+  fontSize: number
+  authorName: string
+  rightPanelOpen: boolean
 }
 
 export interface WatchedFile {

@@ -18,7 +18,7 @@ export interface Tab {
   scrollTop: number
 }
 
-function parseFileIntoTab(filePath: string, content: string, pinned: boolean): Tab {
+function parseFileIntoTab(filePath: string, content: string, pinned: boolean, defaultMode: EditorMode = 'review'): Tab {
   const fileName = filePath.split('/').pop() || filePath
   let cleanContent = content
   let inlineComments: InlineComment[] = []
@@ -35,7 +35,7 @@ function parseFileIntoTab(filePath: string, content: string, pinned: boolean): T
 
   return {
     filePath, fileName, rawContent: content, cleanContent, editContent: cleanContent,
-    inlineComments, documentComments, hasUnsavedChanges: false, mode: 'review', pinned, scrollTop: 0
+    inlineComments, documentComments, hasUnsavedChanges: false, mode: defaultMode, pinned, scrollTop: 0
   }
 }
 
@@ -50,7 +50,7 @@ export interface TabManager {
   updateActiveTab: (updates: Partial<Tab>) => void
 }
 
-export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
+export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: EditorMode = 'review'): TabManager {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabIndex, setActiveTabIndex] = useState<number>(-1)
 
@@ -91,7 +91,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
         return
       }
 
-      const newTab = parseFileIntoTab(filePath, content, pinned)
+      const newTab = parseFileIntoTab(filePath, content, pinned, defaultMode)
 
       if (!pinned) {
         const previewIndex = tabs.findIndex((t) => !t.pinned)
@@ -111,7 +111,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void): TabManager {
       window.electronAPI.watchFile(filePath)
       onFileViewed?.(filePath)
     },
-    [tabs, updateTab, onFileViewed, confirmDiscardChanges]
+    [tabs, updateTab, onFileViewed, confirmDiscardChanges, defaultMode]
   )
 
   const closeTab = useCallback(

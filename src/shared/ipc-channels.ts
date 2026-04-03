@@ -13,5 +13,6 @@ export const IPC = {
   SETTINGS_SAVE: 'settings:save',
   ADD_FOLDER: 'folder:add',
   REMOVE_FOLDER: 'folder:remove',
-  LIST_RECENT_FILES: 'folder:listRecent'
+  LIST_RECENT_FILES: 'folder:listRecent',
+  SET_APP_ICON: 'settings:setAppIcon'
 } as const

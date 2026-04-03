@@ -62,6 +62,7 @@ function FileNode({
       <div
         className={`file-node-row file ${isActive ? 'active' : ''}`}
         style={{ paddingLeft: `${12 + depth * 12}px` }}
+        title={entry.path}
         onClick={() => onSelectFile(entry.path)}
         onDoubleClick={() => onDoubleClickFile?.(entry.path)}
       >

@@ -23,7 +23,7 @@ export interface ActiveDocumentState {
   dismissExternalChange: () => void
 }
 
-export function useActiveDocument(tabManager: TabManager, autosave = true): ActiveDocumentState {
+export function useActiveDocument(tabManager: TabManager, autosave = true, authorName = ''): ActiveDocumentState {
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -47,10 +47,23 @@ export function useActiveDocument(tabManager: TabManager, autosave = true): Acti
     return result
   }, [activeTab?.cleanContent])
 
+  // Suppress false change events briefly after opening a file
+  const openedAtRef = useRef<{ path: string; time: number } | null>(null)
+  useEffect(() => {
+    if (activeTab) {
+      openedAtRef.current = { path: activeTab.filePath, time: Date.now() }
+    }
+  }, [activeTab?.filePath])
+
   // Listen for external file changes
   useEffect(() => {
     const cleanup = window.electronAPI.onFileChanged((changedPath: string) => {
       if (activeTab && changedPath === activeTab.filePath) {
+        // Suppress if file was just opened (within 2s)
+        const opened = openedAtRef.current
+        if (opened && opened.path === changedPath && Date.now() - opened.time < 2000) {
+          return
+        }
         setShowExternalChangeBar(true)
       }
     })
@@ -113,24 +126,24 @@ export function useActiveDocument(tabManager: TabManager, autosave = true): Acti
     (anchor: string, body: string) => {
       if (!activeTab) return
       updateActiveTab({
-        inlineComments: [...activeTab.inlineComments, createInlineComment(anchor, body, '')],
+        inlineComments: [...activeTab.inlineComments, createInlineComment(anchor, body, authorName)],
         hasUnsavedChanges: true, pinned: true
       })
       triggerAutosave()
     },
-    [activeTab, updateActiveTab, triggerAutosave]
+    [activeTab, updateActiveTab, triggerAutosave, authorName]
   )
 
   const addDocumentComment = useCallback(
     (body: string) => {
       if (!activeTab) return
       updateActiveTab({
-        documentComments: [...activeTab.documentComments, createDocumentComment(body, '')],
+        documentComments: [...activeTab.documentComments, createDocumentComment(body, authorName)],
         hasUnsavedChanges: true, pinned: true
       })
       triggerAutosave()
     },
-    [activeTab, updateActiveTab, triggerAutosave]
+    [activeTab, updateActiveTab, triggerAutosave, authorName]
   )
 
   const editInlineComment = useCallback(
