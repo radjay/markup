@@ -312,14 +312,6 @@ code {
   padding: 0 8px;
 }
 
-.step-number {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--accent);
-  margin-bottom: 16px;
-  font-weight: 500;
-}
-
 .step-icon {
   display: flex;
   align-items: center;
