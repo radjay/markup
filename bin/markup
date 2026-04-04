@@ -1,0 +1,49 @@
+#!/bin/bash
+# markup — open markdown files in Markup.app
+# Usage: markup [open] <file.md> [file2.md ...]
+#        markup (no args) — launch Markup
+
+set -e
+
+APP_NAME="Markup"
+APP_PATH="/Applications/Markup.app"
+
+# Check if Markup is installed
+if [ ! -d "$APP_PATH" ]; then
+  echo "Error: Markup.app not found at $APP_PATH" >&2
+  echo "Install it with: npm run install-app" >&2
+  exit 1
+fi
+
+# No arguments — just launch the app
+if [ $# -eq 0 ]; then
+  open -a "$APP_NAME"
+  exit 0
+fi
+
+# Skip "open" subcommand if present
+args=("$@")
+if [ "${args[0]}" = "open" ]; then
+  args=("${args[@]:1}")
+fi
+
+if [ ${#args[@]} -eq 0 ]; then
+  open -a "$APP_NAME"
+  exit 0
+fi
+
+# Open each file
+for file in "${args[@]}"; do
+  # Resolve to absolute path
+  if [[ "$file" != /* ]]; then
+    file="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+  fi
+
+  if [ ! -f "$file" ]; then
+    echo "Warning: file not found: $file" >&2
+    continue
+  fi
+
+  # open -a sends the file path to Electron's open-file event
+  open -a "$APP_NAME" "$file"
+done

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Native markdown editor for reviewing AI-generated plans and documents",
   "main": "./out/main/index.js",
+  "bin": {
+    "markup": "bin/markup"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -13,7 +16,8 @@
     "check": "electron-vite build",
     "dist": "npm run build && electron-builder --mac",
     "dist:dir": "npm run build && electron-builder --mac --dir",
-    "install-app": "osascript -e 'tell application \"Markup\" to quit' 2>/dev/null; sleep 2; rm -rf release/ out/ /Applications/Markup.app && npm run dist:dir && cp -R release/mac-arm64/Markup.app /Applications/Markup.app && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Markup.app && xattr -cr /Applications/Markup.app && echo 'Installed to /Applications/Markup.app'"
+    "install-app": "osascript -e 'tell application \"Markup\" to quit' 2>/dev/null; sleep 2; rm -rf release/ out/ /Applications/Markup.app && npm run dist:dir && cp -R release/mac-arm64/Markup.app /Applications/Markup.app && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Markup.app && xattr -cr /Applications/Markup.app && echo 'Installed to /Applications/Markup.app'",
+    "install-cli": "ln -sf \"$(pwd)/bin/markup\" /usr/local/bin/markup && echo 'CLI installed: markup'"
   },
   "build": {
     "appId": "com.markup.app",
@@ -30,6 +34,18 @@
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown",
+          "role": "Editor"
+        },
+        {
+          "ext": "markdown",
+          "name": "Markdown",
+          "role": "Editor"
+        }
       ]
     },
     "dmg": {
