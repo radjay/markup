@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Settings as SettingsIcon, PanelRight } from 'lucide-react'
 import { useWorkspace } from './hooks/useWorkspace'
 import { useTabs } from './hooks/useTabs'
@@ -7,7 +7,7 @@ import { useAppEvents } from './hooks/useAppEvents'
 import { WelcomeScreen } from './components/Layout/WelcomeScreen'
 import { TabBar } from './components/Layout/TabBar'
 import { ExternalChangeBar } from './components/Layout/ExternalChangeBar'
-import { EditorPane } from './components/Layout/EditorPane'
+import { EditorPane, type EditorPaneHandle } from './components/Layout/EditorPane'
 import { RightPanel } from './components/Layout/RightPanel'
 import { FileTree } from './components/Sidebar/FileTree'
 import { RecentFiles } from './components/Sidebar/RecentFiles'
@@ -25,8 +25,34 @@ export default function App() {
   const workspace = useWorkspace()
   const tabManager = useTabs(workspace.markViewed, workspace.allSettings.defaultMode)
   const doc = useActiveDocument(tabManager, workspace.autosave, workspace.allSettings.authorName)
-  const events = useAppEvents({ workspace, tabManager, doc })
+  const editorPaneRef = useRef<EditorPaneHandle>(null)
   const [showSettings, setShowSettings] = useState(false)
+
+  // Save current scroll position into tab state before switching away
+  const saveScrollPosition = useCallback(() => {
+    if (editorPaneRef.current && tabManager.activeTabIndex >= 0) {
+      tabManager.updateActiveTab({ scrollTop: editorPaneRef.current.getScrollTop() })
+    }
+  }, [tabManager])
+
+  // Wrap tabManager with scroll-saving versions for events
+  const wrappedTabManager = {
+    ...tabManager,
+    clickTab: (index: number) => {
+      saveScrollPosition()
+      tabManager.clickTab(index)
+    },
+    openFileInTab: (filePath: string, content: string, pinned: boolean) => {
+      saveScrollPosition()
+      tabManager.openFileInTab(filePath, content, pinned)
+    },
+    closeTab: (index: number) => {
+      saveScrollPosition()
+      tabManager.closeTab(index)
+    }
+  }
+
+  const events = useAppEvents({ workspace, tabManager: wrappedTabManager, doc })
 
   const toggleSettings = useCallback(() => setShowSettings((s) => !s), [])
 
@@ -123,7 +149,7 @@ export default function App() {
         </aside>
 
         <div className="editor-area">
-          <TabBar tabManager={tabManager} doc={doc} autosave={workspace.autosave} />
+          <TabBar tabManager={wrappedTabManager} doc={doc} autosave={workspace.autosave} />
           {doc.showExternalChangeBar && (
             <ExternalChangeBar
               hasUnsavedChanges={tabManager.activeTab?.hasUnsavedChanges ?? false}
@@ -138,9 +164,9 @@ export default function App() {
             </div>
           )}
           <EditorPane
+            ref={editorPaneRef}
             activeTab={tabManager.activeTab}
             doc={doc}
-            onScrollChange={(scrollTop) => tabManager.updateActiveTab({ scrollTop })}
           />
           {tabManager.activeTab && (
             <div className="floating-mode-toggle">

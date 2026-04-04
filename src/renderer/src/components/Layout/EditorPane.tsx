@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { ReviewMode } from '../Editor/ReviewMode'
 import { EditMode } from '../Editor/EditMode'
 import type { Tab } from '../../hooks/useTabs'
@@ -7,13 +7,22 @@ import type { ActiveDocumentState } from '../../hooks/useActiveDocument'
 interface Props {
   activeTab: Tab | null
   doc: ActiveDocumentState
-  onScrollChange?: (scrollTop: number) => void
 }
 
-export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
+export interface EditorPaneHandle {
+  getScrollTop: () => number
+}
+
+export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPane(
+  { activeTab, doc },
+  ref
+) {
   const paneRef = useRef<HTMLDivElement>(null)
   const lastFileRef = useRef<string | null>(null)
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    getScrollTop: () => paneRef.current?.scrollTop ?? 0
+  }))
 
   // Restore scroll position when switching to a tab
   useEffect(() => {
@@ -23,25 +32,6 @@ export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
       lastFileRef.current = activeTab.filePath
     }
   }, [activeTab?.filePath, activeTab?.scrollTop])
-
-  // Save scroll position — debounced to avoid re-render storms
-  useEffect(() => {
-    const pane = paneRef.current
-    if (!pane || !onScrollChange) return
-
-    const handleScroll = () => {
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-      scrollTimerRef.current = setTimeout(() => {
-        if (pane) onScrollChange(pane.scrollTop)
-      }, 500)
-    }
-
-    pane.addEventListener('scroll', handleScroll, { passive: true })
-    return () => {
-      pane.removeEventListener('scroll', handleScroll)
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-    }
-  }, [onScrollChange])
 
   if (!activeTab) {
     return (
@@ -73,4 +63,4 @@ export function EditorPane({ activeTab, doc, onScrollChange }: Props) {
       )}
     </div>
   )
-}
+})

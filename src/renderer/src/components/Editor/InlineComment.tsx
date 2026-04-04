@@ -1,45 +1,62 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect } from 'react'
 import { Pencil } from 'lucide-react'
 import type { InlineComment as InlineCommentType } from '../../../../shared/types'
+
+interface EditDraft {
+  id: string
+  text: string
+}
 
 interface Props {
   anchor: string
   comments: InlineCommentType[]
+  draftText: string
+  onDraftChange: (text: string) => void
+  editDraft: EditDraft | null
+  onEditStart: (id: string, text: string) => void
+  onEditChange: (text: string) => void
+  onEditSave: () => void
+  onEditCancel: () => void
   onSubmit: (body: string) => void
   onClose: () => void
-  onEdit: (id: string, body: string) => void
   onDelete: (id: string) => void
 }
 
-export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onDelete }: Props) {
-  const [text, setText] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
+export function InlineComment({
+  anchor, comments, draftText, onDraftChange,
+  editDraft, onEditStart, onEditChange, onEditSave, onEditCancel,
+  onSubmit, onClose, onDelete
+}: Props) {
   const mountedRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    // Only focus on initial mount, not on re-renders (which would scroll back)
     if (!mountedRef.current) {
       mountedRef.current = true
-      inputRef.current?.focus({ preventScroll: true })
+      if (inputRef.current) {
+        inputRef.current.focus({ preventScroll: true })
+        // Place cursor at end if restoring draft
+        if (draftText) {
+          inputRef.current.selectionStart = draftText.length
+          inputRef.current.selectionEnd = draftText.length
+        }
+      }
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refocus when exiting edit mode
   const prevEditingRef = useRef<string | null>(null)
   useEffect(() => {
-    if (prevEditingRef.current && !editingId) {
+    if (prevEditingRef.current && !editDraft) {
       inputRef.current?.focus({ preventScroll: true })
     }
-    prevEditingRef.current = editingId
-  }, [editingId])
+    prevEditingRef.current = editDraft?.id ?? null
+  }, [editDraft])
 
   const handleSubmit = () => {
-    const trimmed = text.trim()
+    const trimmed = draftText.trim()
     if (trimmed) {
       onSubmit(trimmed)
-      setText('')
     }
   }
 
@@ -53,31 +70,13 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
     }
   }
 
-  const startEdit = (comment: InlineCommentType) => {
-    setEditingId(comment.id)
-    setEditText(comment.body)
-  }
-
-  const saveEdit = () => {
-    if (editingId && editText.trim()) {
-      onEdit(editingId, editText.trim())
-      setEditingId(null)
-      setEditText('')
-    }
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditText('')
-  }
-
   const handleEditKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
-      saveEdit()
+      onEditSave()
     }
     if (e.key === 'Escape') {
-      cancelEdit()
+      onEditCancel()
     }
   }
 
@@ -101,7 +100,7 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
                 <div className="comment-item-actions">
                   <button
                     className="comment-edit"
-                    onClick={() => startEdit(c)}
+                    onClick={() => onEditStart(c.id, c.body)}
                     title="Edit comment"
                   >
                     <Pencil size={12} />
@@ -115,20 +114,18 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
                   </button>
                 </div>
               </div>
-              {editingId === c.id ? (
+              {editDraft?.id === c.id ? (
                 <div className="comment-edit-area">
                   <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
+                    value={editDraft.text}
+                    onChange={(e) => onEditChange(e.target.value)}
                     onKeyDown={handleEditKeyDown}
                     rows={2}
-                    ref={useCallback((el: HTMLTextAreaElement | null) => {
-                      el?.focus({ preventScroll: true })
-                    }, [])}
+                    ref={(el) => el?.focus({ preventScroll: true })}
                   />
                   <div className="comment-edit-actions">
-                    <button onClick={cancelEdit} className="comment-edit-cancel">Cancel</button>
-                    <button onClick={saveEdit} disabled={!editText.trim()} className="comment-submit">Save</button>
+                    <button onClick={onEditCancel} className="comment-edit-cancel">Cancel</button>
+                    <button onClick={onEditSave} disabled={!editDraft.text.trim()} className="comment-submit">Save</button>
                   </div>
                 </div>
               ) : (
@@ -142,15 +139,15 @@ export function InlineComment({ anchor, comments, onSubmit, onClose, onEdit, onD
       <div className="comment-input-area">
         <textarea
           ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          value={draftText}
+          onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Add a comment..."
           rows={3}
         />
         <div className="comment-actions">
           <span className="comment-hint">Cmd+Enter to submit</span>
-          <button onClick={handleSubmit} disabled={!text.trim()} className="comment-submit">
+          <button onClick={handleSubmit} disabled={!draftText.trim()} className="comment-submit">
             Comment
           </button>
         </div>
