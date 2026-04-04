@@ -16,29 +16,29 @@ v0.2 stabilizes the v0.1 foundation and addresses all feedback from the first ro
 
 ## Critical Bug Fixes
 
-- [ ] **File watching triggers on self-save** — saving in Markup immediately shows "modified externally" bar. Suppress change events for our own writes (e.g., track last-save timestamp per path, ignore chokidar events within a short window)
-- [ ] **`-->` in comment body breaks serialization** — escape `-->` as `--&gt;` on serialize, unescape on parse (`src/renderer/src/lib/markdown/comments.ts`)
-- [ ] **No unsaved-changes prompt on file/tab switch** — show confirmation dialog before switching away from a dirty tab
-- [ ] **Silent save failures** — catch write errors and show an inline error banner
+- [x] **File watching triggers on self-save** — self-saves suppressed via timestamp tracking (2s window)
+- [x] **`-->` in comment body breaks serialization** — escaped as `--&gt;` on serialize, unescaped on parse
+- [x] **No unsaved-changes prompt on file/tab switch** — confirmation dialog when switching away from dirty tab
+- [x] **Silent save failures** — inline error banner with dismiss on write errors
 - [x] **Comment badge always shows "1" and pushes content down** — badge count wasn't reflecting actual comment count per anchor; also moved badge to left side of block instead of below content
-- [ ] **Deleted file handling** — graceful error when file is removed between sidebar listing and click
+- [x] **Deleted file handling** — try/catch with user alert on error
 
 ## UX Improvements
 
-- [ ] **Solid Save button** — render Save as a filled primary-color button when there are unsaved changes (currently it's an outline button that doesn't stand out)
-- [ ] **Edit comments** — add edit capability to both inline and document-level comments (currently can only add and delete). Pencil icon, inline textarea, Cmd+Enter to confirm
-- [ ] **Scroll position per tab** — store `scrollTop` in tab state on switch-away, restore on switch-back
-- [ ] **External change + unsaved work** — warn that reload will discard unsaved changes before proceeding
-- [ ] **Git branch on folder headers** — show the current branch next to each top-level folder name in the Files sidebar (git info already available via `folder-watcher.ts`)
-- [ ] **Remove dot prefix from Document Outline title** — the "DOCUMENT OUTLINE" panel header has a leading bullet that looks odd
-- [ ] **Outline scroll in edit mode** — currently queries `.review-mode` DOM which doesn't exist in edit mode; needs CodeMirror line-based fallback
-- [ ] **Duplicate heading IDs in outline** — disambiguate so clicking scrolls to the correct heading instance
-- [ ] **Anchor stability after heading edits** — fallback anchoring when heading content hash changes
+- [x] **Solid Save button** — Save button now solid primary color when unsaved changes exist
+- [x] **Edit comments** — inline and document-level comments editable via pencil icon, Cmd+Enter to confirm
+- [x] **Scroll position per tab** — scrollTop stored in tab state on switch-away, restored on switch-back
+- [x] **External change + unsaved work** — reload warns about discarding unsaved changes
+- [x] **Git branch on folder headers** — branch name shown next to top-level folders in Files sidebar
+- [x] **Remove dot prefix from Document Outline title** — leading bullet removed from panel title
+- [x] **Outline scroll in edit mode** — CodeMirror line-based scroll fallback added
+- [x] **Duplicate heading IDs in outline** — disambiguated with counters for unique IDs
+- [x] **Anchor stability after heading edits** — fallback positional anchoring when heading text changes
 
 ## New Features
 
-- [ ] **CLI to open files** — register a `markup` command or URL scheme so files can be opened from the terminal (e.g., `markup open docs/plan.md`). Handle via Electron `open-file` event or `second-instance` with argv
-- [ ] **UI kit / color scheme docs** — create `docs/ui-kit.md` documenting CSS custom properties, typography scale, component patterns, and the Lucide Icons convention
+- [ ] **CLI to open files** — register a `markup` command or URL scheme so files can be opened from the terminal (e.g., `markup open docs/plan.md`). Handle via Electron `open-file` event or `second-instance` with argv. Tracked as RAD-14.
+- [x] **UI kit / color scheme docs** — created `docs/ui-kit.md` with full design system documentation
 
 ## Documentation & Housekeeping
 

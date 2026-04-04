@@ -204,12 +204,12 @@ Create these files in a test directory before starting:
 
 ---
 
-## Known Gaps (v0.1)
+## Known Gaps (v0.1) — All Resolved
 
-1. **No unsaved-changes prompt on file switch** — switching files discards unsaved comments silently
-2. **Save failure is silent** — no error UI when write fails
-3. **`-->` in comment body breaks serialization** — prematurely closes HTML comment
-4. **Duplicate heading IDs** — outline click scrolls to first match only
-5. **Anchor mismatch after heading edit** — comment may misplace after heading text changes
-6. **No error handling on file select** — if file is deleted between listing and clicking, unhandled rejection
-7. **Outline scroll doesn't work in edit mode** — queries `.review-mode` DOM which doesn't exist in edit mode
+1. ~~**No unsaved-changes prompt on file switch**~~ — fixed: confirmation dialog on dirty tab switch
+2. ~~**Save failure is silent**~~ — fixed: inline error banner with dismiss
+3. ~~**`-->` in comment body breaks serialization**~~ — fixed: escaped as `--&gt;` on serialize
+4. ~~**Duplicate heading IDs**~~ — fixed: disambiguated with counters
+5. ~~**Anchor mismatch after heading edit**~~ — fixed: fallback positional anchoring
+6. ~~**No error handling on file select**~~ — fixed: try/catch with user alert
+7. ~~**Outline scroll doesn't work in edit mode**~~ — fixed: CodeMirror line-based fallback

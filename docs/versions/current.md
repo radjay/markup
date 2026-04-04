@@ -72,20 +72,22 @@ Native macOS markdown editor for reviewing AI-generated plans and documents. Bui
 
 Settings stored as JSON at `~/Library/Application Support/markup/markup-settings.json`.
 
-## Known Issues
+## Known Issues (v0.1)
 
-### Bugs
-1. **Tab switching doesn't preserve scroll position** — each tab should remember where the user was
-2. **`-->` in comment body breaks serialization** — prematurely closes the HTML comment
-3. **Duplicate heading IDs** — outline click scrolls to first match only
-4. **Anchor mismatch after heading edit** — comment may misplace after heading text changes
-5. **No error handling on deleted file select** — unhandled rejection if file is deleted between listing and clicking
-6. **Outline scroll doesn't work in edit mode** — queries `.review-mode` DOM which doesn't exist
+All v0.1 known issues have been resolved. See below for what was fixed.
 
-### Missing UX
-7. **No unsaved-changes prompt on file switch** — switching files discards unsaved comments silently
-8. **Save failure is silent** — no error UI when write fails
-9. **External change with unsaved work** — reload loses unsaved comments with no warning
+### Fixed Bugs
+1. ~~**Tab switching doesn't preserve scroll position**~~ — scroll position now stored per tab and restored on switch
+2. ~~**`-->` in comment body breaks serialization**~~ — `-->` escaped as `--&gt;` on serialize, unescaped on parse
+3. ~~**Duplicate heading IDs**~~ — outline now disambiguates duplicate headings with counters
+4. ~~**Anchor mismatch after heading edit**~~ — fallback positional anchoring when heading text changes
+5. ~~**No error handling on deleted file select**~~ — try/catch with user alert on error
+6. ~~**Outline scroll doesn't work in edit mode**~~ — CodeMirror line-based scroll fallback added
+
+### Fixed UX
+7. ~~**No unsaved-changes prompt on file switch**~~ — confirmation dialog when switching away from dirty tab
+8. ~~**Save failure is silent**~~ — save errors now show inline error banner with dismiss
+9. ~~**External change with unsaved work**~~ — reload warns about discarding unsaved changes
 
 ## Tech Stack
 
@@ -109,13 +111,17 @@ Settings stored as JSON at `~/Library/Application Support/markup/markup-settings
 - Icon: `assets/icon.icns`
 - Build: `npm run dist`
 
-<!-- @markup-doc-comments
-{"id":"0nk1m8osv2HbGgJg6BYwi","type":"document","author":"","ts":"2026-03-31T10:44:11.279Z","body":"We should keep provenance of previous comments and changes that were made in frontmatter or ideally at the very end of the document (for readability in other readers). The section should be very clearly labeled as feedback that was addressed. The claude skill should probably know as well that provenance data is from previous iterations."}
-{"id":"WluA0eVx4G9ARlKWvs79H","type":"document","author":"","ts":"2026-03-31T10:45:10.252Z","body":"Let's make the Save button more outspoken as well. right now its an outline button, I think its should be a solid button in primary color."}
-{"id":"SWc5NygQaAgB-kgJmoSh7","type":"document","author":"","ts":"2026-03-31T10:46:03.701Z","body":"Let's add a UI kit/color scheme to the repo as well."}
-{"id":"kuoltoZxt9H9wSsBar04w","type":"document","author":"","ts":"2026-03-31T10:47:15.973Z","body":"In the Files tab, let's add the repo branch next to each top level folder (if its a repo)"}
-{"id":"oE-3MljQFvD4yMye3oPrE","type":"document","author":"","ts":"2026-03-31T10:48:04.237Z","body":"Update the title for \"Document Outline\" panel, remove the \"•\""}
-{"id":"O39upY4yOcc0Q6MRznTKq","type":"document","author":"","ts":"2026-03-31T10:49:52.111Z","body":"We need a CLI as well to open files in Markup"}
-{"id":"PQuwGe0NePy866QUZhSc6","type":"document","author":"","ts":"2026-03-31T10:50:22.017Z","body":"Improvement: edit comments! Currently can only add and delete!"}
-{"id":"WyfwLyQy3Y0uryO21d3lg","type":"document","author":"","ts":"2026-03-31T10:52:38.656Z","body":"After saving a file in Markup, the app immediately shows \"File was modified eternally\" message, File watching should ignore saves by markup!"}
--->
+## Addressed Feedback (from v0.1 review)
+
+The following document-level feedback was left during the v0.1 review and has since been addressed:
+
+1. ~~Save button prominence~~ — Save button is now solid primary color when unsaved changes exist
+2. ~~UI kit / color scheme~~ — Created `docs/ui-kit.md` with full design system documentation
+3. ~~Git branch on folder headers~~ — Branch name shown next to top-level folders in Files sidebar
+4. ~~Document Outline title dot~~ — Leading bullet removed from panel title
+5. ~~Edit comments~~ — Inline and document-level comments now editable via pencil icon
+6. ~~File watching triggers on self-save~~ — Self-saves suppressed via timestamp tracking (2s window)
+
+**Still open (tracked in RAD Issues):**
+- Comment provenance/history — resolved comments not yet archived (RAD-15)
+- CLI to open files from terminal (RAD-14)

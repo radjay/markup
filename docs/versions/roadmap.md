@@ -10,17 +10,17 @@ date: 2026-03-30
 Focus: Fix the known issues from v0.1 and polish the day-to-day UX. No new features — just make what exists reliable.
 
 ### Bug Fixes
-- [ ] **Unsaved-changes prompt on file/tab switch** — warn before discarding unsaved comments
-- [ ] **Save failure UI** — show error toast/banner when write fails (e.g., read-only file)
-- [ ] **`-->` in comment body** — escape or encode arrow sequences to prevent HTML comment breakage
-- [ ] **Scroll position per tab** — preserve and restore scroll position when switching tabs
-- [ ] **Deleted file handling** — graceful error when a file is removed between sidebar listing and click
-- [ ] **Outline scroll in edit mode** — currently queries `.review-mode` DOM; needs CodeMirror line-scroll fallback
-- [ ] **Duplicate heading IDs in outline** — disambiguate so clicking scrolls to the correct one
-- [ ] **Anchor stability after heading edits** — fallback anchoring strategy when content hash changes
+- [x] **Unsaved-changes prompt on file/tab switch** — confirmation dialog on dirty tab switch
+- [x] **Save failure UI** — inline error banner with dismiss on write errors
+- [x] **`-->` in comment body** — escaped as `--&gt;` on serialize, unescaped on parse
+- [x] **Scroll position per tab** — scrollTop stored per tab and restored on switch
+- [x] **Deleted file handling** — try/catch with user alert on error
+- [x] **Outline scroll in edit mode** — CodeMirror line-based scroll fallback
+- [x] **Duplicate heading IDs in outline** — disambiguated with counters
+- [x] **Anchor stability after heading edits** — fallback positional anchoring
 
 ### UX Polish
-- [ ] **External change + unsaved work** — warn user that reload will discard their unsaved comments
+- [x] **External change + unsaved work** — reload warns about discarding unsaved changes
 - [ ] **Typecheck CI** — run `npm run typecheck` in a pre-commit hook or CI
 - [ ] **Update BUGS.md** — close the 2 feature requests already shipped (folder persistence, multi-folder)
 
