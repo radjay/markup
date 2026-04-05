@@ -18,9 +18,10 @@ export interface Tab {
   pinned: boolean
   scrollTop: number
   sha?: string
+  workspaceId?: string  // repo ID for GitHub files; undefined for local Electron files
 }
 
-function parseFileIntoTab(filePath: string, content: string, pinned: boolean, defaultMode: EditorMode = 'review', sha?: string): Tab {
+function parseFileIntoTab(filePath: string, content: string, pinned: boolean, defaultMode: EditorMode = 'review', sha?: string, workspaceId?: string): Tab {
   const fileName = filePath.split('/').pop() || filePath
   let cleanContent = content
   let inlineComments: InlineComment[] = []
@@ -37,7 +38,7 @@ function parseFileIntoTab(filePath: string, content: string, pinned: boolean, de
 
   return {
     filePath, fileName, rawContent: content, cleanContent, editContent: cleanContent,
-    inlineComments, documentComments, hasUnsavedChanges: false, mode: defaultMode, pinned, scrollTop: 0, sha
+    inlineComments, documentComments, hasUnsavedChanges: false, mode: defaultMode, pinned, scrollTop: 0, sha, workspaceId
   }
 }
 
@@ -45,7 +46,7 @@ export interface TabManager {
   tabs: Tab[]
   activeTabIndex: number
   activeTab: Tab | null
-  openFileInTab: (filePath: string, content: string, pinned: boolean, sha?: string) => void
+  openFileInTab: (filePath: string, content: string, pinned: boolean, sha?: string, workspaceId?: string) => void
   closeTab: (index: number) => void
   clickTab: (index: number) => void
   updateTab: (index: number, updates: Partial<Tab>) => void
@@ -85,7 +86,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
   )
 
   const openFileInTab = useCallback(
-    (filePath: string, content: string, pinned: boolean, sha?: string) => {
+    (filePath: string, content: string, pinned: boolean, sha?: string, workspaceId?: string) => {
       const existingIndex = tabs.findIndex((t) => t.filePath === filePath)
       if (existingIndex >= 0) {
         setActiveTabIndex(existingIndex)
@@ -94,7 +95,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
         return
       }
 
-      const newTab = parseFileIntoTab(filePath, content, pinned, defaultMode, sha)
+      const newTab = parseFileIntoTab(filePath, content, pinned, defaultMode, sha, workspaceId)
 
       if (!pinned) {
         const previewIndex = tabs.findIndex((t) => !t.pinned)

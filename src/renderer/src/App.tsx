@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Settings as SettingsIcon, PanelRight } from 'lucide-react'
 import { useWorkspace } from './hooks/useWorkspace'
 import { useTabs } from './hooks/useTabs'
@@ -14,8 +14,11 @@ import { FileTree } from './components/Sidebar/FileTree'
 import { RecentFiles } from './components/Sidebar/RecentFiles'
 import { SidebarHeader } from './components/Sidebar/SidebarHeader'
 import { SettingsModal } from './components/Settings/SettingsModal'
+import { RepoPicker } from './components/GitHub/RepoPicker'
 import { SegmentedToggle } from './components/ui/SegmentedToggle'
 import { ElectronFileService } from '../../lib/platform/ElectronFileService'
+import { GitHubFileService } from '../../lib/platform/GitHubFileService'
+import { CapacitorStorageService } from '../../lib/platform/CapacitorStorageService'
 import { FileServiceProvider } from '../../lib/platform/FileServiceContext'
 import { useFileService } from '../../lib/platform/FileServiceContext'
 import type { WorkspaceSettings } from '../../shared/types'
@@ -27,10 +30,57 @@ const modeOptions = [
 
 const isIOS = import.meta.env.MODE === 'ios'
 
-// Singleton so we don't recreate on each render
-const electronFileService = isIOS ? null : new ElectronFileService()
+// Platform singletons — created once, never recreated
+const iosStorageService = isIOS ? new CapacitorStorageService() : null
+const iosFileService = isIOS ? new GitHubFileService(iosStorageService!) : null
+const electronFileService = !isIOS ? new ElectronFileService() : null
 
-function AppInner() {
+// ── iOS wrapper that manages PAT state ────────────────────────────────────────
+
+function IOSApp() {
+  const [pat, setPat] = useState<string | null>(null)
+  const [patLoaded, setPatLoaded] = useState(false)
+  const [showRepoPicker, setShowRepoPicker] = useState(false)
+
+  useEffect(() => {
+    iosStorageService!.getPAT().then((t) => {
+      setPat(t)
+      setPatLoaded(true)
+    })
+  }, [])
+
+  if (!patLoaded) return null
+
+  return (
+    <FileServiceProvider value={iosFileService!}>
+      <AppInner
+        pat={pat}
+        onPATChange={async (token) => {
+          await iosStorageService!.setPAT(token)
+          setPat(token)
+        }}
+        showRepoPicker={showRepoPicker}
+        onOpenRepoPicker={() => setShowRepoPicker(true)}
+        onCloseRepoPicker={() => setShowRepoPicker(false)}
+      />
+    </FileServiceProvider>
+  )
+}
+
+// ── Shared inner app (both platforms) ────────────────────────────────────────
+
+interface AppInnerProps {
+  // iOS-only
+  pat?: string | null
+  onPATChange?: (token: string) => void
+  showRepoPicker?: boolean
+  onOpenRepoPicker?: () => void
+  onCloseRepoPicker?: () => void
+}
+
+function AppInner({
+  pat, onPATChange, showRepoPicker, onOpenRepoPicker, onCloseRepoPicker
+}: AppInnerProps) {
   const fileService = useFileService()
   const workspace = useWorkspace()
   const tabManager = useTabs(workspace.markViewed, workspace.allSettings.defaultMode)
@@ -40,13 +90,9 @@ function AppInner() {
   const toggleSettings = useCallback(() => setShowSettings((s) => !s), [])
 
   const eventsElectron = useAppEvents(
-    isIOS
-      ? { workspace, tabManager, doc, openSettings: toggleSettings }
-      : { workspace, tabManager, doc, openSettings: toggleSettings }
+    { workspace, tabManager, doc, openSettings: toggleSettings }
   )
   const eventsIOS = useIOSAppEvents({ workspace, tabManager, doc })
-
-  // Select the right event handlers based on platform
   const events = isIOS ? eventsIOS : eventsElectron
 
   const handleSettingChange = useCallback(
@@ -56,19 +102,30 @@ function AppInner() {
       workspace.reloadSettings(updated)
 
       // Apply icon change immediately — desktop only
-      if (key === 'appIcon' && import.meta.env.MODE !== 'ios') {
+      if (key === 'appIcon' && !isIOS) {
         await window.electronAPI.setAppIcon(value as 'light' | 'dark')
       }
     },
     [workspace, fileService]
   )
 
+  const handleRemoveRepo = useCallback(
+    (id: string) => workspace.removeFolder(id),
+    [workspace]
+  )
+
   if (!workspace.loaded) return null
 
-  if (tabManager.tabs.length === 0 && workspace.folders.length === 0) {
+  const hasWorkspaces = workspace.folders.length > 0 || tabManager.tabs.length > 0
+
+  if (!hasWorkspaces) {
     return (
       <>
-        <WelcomeScreen onOpenFile={events.handleOpen} onAddFolder={workspace.addFolder} />
+        <WelcomeScreen
+          onOpenFile={events.handleOpen}
+          onAddFolder={workspace.addFolder}
+          onConnectRepo={onOpenRepoPicker}
+        />
         <button className="titlebar-settings-btn" onClick={toggleSettings} title="Settings (Cmd+,)">
           <SettingsIcon size={15} />
         </button>
@@ -77,15 +134,32 @@ function AppInner() {
             settings={workspace.allSettings}
             onSettingChange={handleSettingChange}
             onClose={() => setShowSettings(false)}
+            pat={pat}
+            onPATChange={onPATChange}
+            repos={isIOS ? workspace.allSettings.repos ?? [] : undefined}
+            onAddRepo={onOpenRepoPicker}
+            onRemoveRepo={isIOS ? handleRemoveRepo : undefined}
+          />
+        )}
+        {showRepoPicker && (
+          <RepoPicker
+            githubService={iosFileService!}
+            onAdd={async (repo) => {
+              await workspace.addRepo(repo)
+              onCloseRepoPicker?.()
+            }}
+            onClose={() => onCloseRepoPicker?.()}
           />
         )}
       </>
     )
   }
 
+  // Build folder entries for FileTree — include displayName for GitHub repos
   const folderEntries = workspace.folders.map((f) => ({
     path: f,
-    files: workspace.folderFiles.get(f) || []
+    files: workspace.folderFiles.get(f) || [],
+    displayName: workspace.folderGitInfo.get(f)?.name,
   }))
 
   return (
@@ -113,6 +187,7 @@ function AppInner() {
             mode={workspace.sidebarMode}
             onModeChange={workspace.setSidebarMode}
             onAddFolder={workspace.addFolder}
+            onAddRepo={onOpenRepoPicker}
           />
           <div className="sidebar-content">
             {workspace.sidebarMode === 'tree' ? (
@@ -129,8 +204,8 @@ function AppInner() {
                 files={workspace.recentFiles}
                 currentFile={tabManager.activeTab?.filePath || null}
                 viewedFiles={workspace.viewedFiles}
-                onSelectFile={events.handleSelectFile}
-                onDoubleClickFile={events.handlePinFile}
+                onSelectFile={(path) => events.handleSelectFile('', path)}
+                onDoubleClickFile={(path) => events.handlePinFile('', path)}
               />
             )}
           </div>
@@ -177,17 +252,33 @@ function AppInner() {
           settings={workspace.allSettings}
           onSettingChange={handleSettingChange}
           onClose={() => setShowSettings(false)}
+          pat={pat}
+          onPATChange={onPATChange}
+          repos={isIOS ? workspace.allSettings.repos ?? [] : undefined}
+          onAddRepo={onOpenRepoPicker}
+          onRemoveRepo={isIOS ? handleRemoveRepo : undefined}
+        />
+      )}
+
+      {showRepoPicker && (
+        <RepoPicker
+          githubService={iosFileService!}
+          onAdd={async (repo) => {
+            await workspace.addRepo(repo)
+            onCloseRepoPicker?.()
+          }}
+          onClose={() => onCloseRepoPicker?.()}
         />
       )}
     </div>
   )
 }
 
+// ── Root ─────────────────────────────────────────────────────────────────────
+
 export default function App() {
   if (isIOS) {
-    // iOS provider — will be swapped for a real implementation in Unit 3
-    // For now render nothing meaningful (iOS file service not yet wired)
-    return null
+    return <IOSApp />
   }
 
   return (

@@ -4,9 +4,9 @@ import {
   GitHubForbiddenError,
   GitHubNotFoundError,
   GitHubConflictError,
-  GitHubRepo,
   GitHubTreeEntry,
 } from './types'
+import type { GitHubRepo } from '../../shared/types'
 
 const BASE_URL = 'https://api.github.com'
 

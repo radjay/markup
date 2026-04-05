@@ -1,11 +1,4 @@
-import type { FileData, FileEntry, WorkspaceSettings, WatchedFile } from '../../shared/types'
-
-// Workspace is defined here until GitHubRepo is added to shared types in Unit 3
-export interface GitHubRepo {
-  owner: string
-  repo: string
-  branch: string
-}
+import type { FileData, FileEntry, WorkspaceSettings, WatchedFile, GitHubRepo } from '../../shared/types'
 
 export interface Workspace {
   id: string

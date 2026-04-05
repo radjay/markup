@@ -1,12 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SegmentedToggle } from '../ui/SegmentedToggle'
-import type { WorkspaceSettings } from '../../../../shared/types'
+import type { WorkspaceSettings, GitHubRepo } from '../../../../shared/types'
 
 interface Props {
   settings: WorkspaceSettings
   onSettingChange: <K extends keyof WorkspaceSettings>(key: K, value: WorkspaceSettings[K]) => void
   onClose: () => void
+  // iOS-only props
+  pat?: string | null
+  onPATChange?: (token: string) => void
+  repos?: GitHubRepo[]
+  onAddRepo?: () => void
+  onRemoveRepo?: (id: string) => void
 }
+
+const isIOS = import.meta.env.MODE === 'ios'
 
 const iconOptions = [
   { value: 'light', label: 'Light' },
@@ -18,8 +26,17 @@ const modeOptions = [
   { value: 'edit', label: 'Edit' }
 ]
 
-export function SettingsModal({ settings, onSettingChange, onClose }: Props) {
+export function SettingsModal({
+  settings, onSettingChange, onClose,
+  pat, onPATChange, repos, onAddRepo, onRemoveRepo
+}: Props) {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const [patInput, setPatInput] = useState(pat ?? '')
+  const [showPAT, setShowPAT] = useState(false)
+
+  useEffect(() => {
+    setPatInput(pat ?? '')
+  }, [pat])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,6 +50,10 @@ export function SettingsModal({ settings, onSettingChange, onClose }: Props) {
     if (e.target === overlayRef.current) onClose()
   }
 
+  const handlePATSave = () => {
+    onPATChange?.(patInput.trim())
+  }
+
   return (
     <div className="settings-overlay" ref={overlayRef} onClick={handleOverlayClick}>
       <div className="settings-modal">
@@ -42,17 +63,96 @@ export function SettingsModal({ settings, onSettingChange, onClose }: Props) {
         </div>
 
         <div className="settings-body">
-          <div className="settings-row">
-            <div className="settings-label">
-              <span className="settings-label-text">App Icon</span>
-              <span className="settings-label-hint">Dock and window icon variant</span>
+          {/* GitHub PAT — iOS only */}
+          {onPATChange && (
+            <div className="settings-section">
+              <h3 className="settings-section-title">GitHub</h3>
+              <div className="settings-row">
+                <div className="settings-label">
+                  <span className="settings-label-text">Personal Access Token</span>
+                  <span className="settings-label-hint">Stored securely in the iOS Keychain</span>
+                </div>
+                <div className="settings-pat-row">
+                  <input
+                    type={showPAT ? 'text' : 'password'}
+                    className="settings-text-input settings-pat-input"
+                    value={patInput}
+                    onChange={(e) => setPatInput(e.target.value)}
+                    placeholder="ghp_…"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    className="settings-number-btn"
+                    onClick={() => setShowPAT((s) => !s)}
+                    title={showPAT ? 'Hide token' : 'Show token'}
+                  >
+                    {showPAT ? '●' : '○'}
+                  </button>
+                  <button className="open-button" style={{ padding: '4px 10px', fontSize: 13 }} onClick={handlePATSave}>
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
-            <SegmentedToggle
-              options={iconOptions}
-              value={settings.appIcon}
-              onChange={(v) => onSettingChange('appIcon', v as 'light' | 'dark')}
-            />
-          </div>
+          )}
+
+          {/* Connected Repos — iOS only */}
+          {repos !== undefined && (
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <h3 className="settings-section-title">Connected Repos</h3>
+                {onAddRepo && (
+                  <button className="open-button open-button-secondary" style={{ padding: '4px 10px', fontSize: 13 }} onClick={onAddRepo}>
+                    + Add
+                  </button>
+                )}
+              </div>
+              {repos.length === 0 ? (
+                <p className="settings-empty-hint">No repos connected yet.</p>
+              ) : (
+                <div className="settings-repo-list">
+                  {repos.map((repo) => (
+                    <div key={repo.id} className="settings-repo-row">
+                      <div className="settings-repo-info">
+                        <span className="settings-repo-name">{repo.owner}/{repo.repo}</span>
+                        <span className="settings-repo-meta">
+                          {repo.branch}{repo.rootPath ? ` · ${repo.rootPath}` : ''}
+                        </span>
+                      </div>
+                      {onRemoveRepo && (
+                        <button
+                          className="folder-remove"
+                          onClick={() => {
+                            if (confirm(`Remove ${repo.owner}/${repo.repo}?`)) {
+                              onRemoveRepo(repo.id)
+                            }
+                          }}
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* App Icon — desktop only */}
+          {!isIOS && (
+            <div className="settings-row">
+              <div className="settings-label">
+                <span className="settings-label-text">App Icon</span>
+                <span className="settings-label-hint">Dock and window icon variant</span>
+              </div>
+              <SegmentedToggle
+                options={iconOptions}
+                value={settings.appIcon}
+                onChange={(v) => onSettingChange('appIcon', v as 'light' | 'dark')}
+              />
+            </div>
+          )}
 
           <div className="settings-row">
             <div className="settings-label">

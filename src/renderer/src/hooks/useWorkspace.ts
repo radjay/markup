@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import type { FileEntry, WatchedFile, WorkspaceSettings } from '../../../shared/types'
+import type { FileEntry, WatchedFile, WorkspaceSettings, GitHubRepo } from '../../../shared/types'
 import { useFileService } from '../../../lib/platform/FileServiceContext'
 
 export type SidebarMode = 'tree' | 'recent'
@@ -16,6 +16,7 @@ export interface WorkspaceState {
   viewedFiles: Set<string>
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
+  addRepo: (repo: GitHubRepo) => Promise<void>
   setSidebarMode: (mode: SidebarMode) => Promise<void>
   reloadSettings: (settings: WorkspaceSettings) => void
   markViewed: (filePath: string) => void
@@ -58,12 +59,15 @@ export function useWorkspace(): WorkspaceState {
   useEffect(() => {
     (async () => {
       const settings = await fileService.loadSettings()
-      setFolders(settings.folders)
+      // Combine local folders and GitHub repo IDs into a single workspace list
+      const repoIds = (settings.repos ?? []).map((r) => r.id)
+      const allWorkspaceIds = [...settings.folders, ...repoIds]
+      setFolders(allWorkspaceIds)
       setSidebarModeState(settings.sidebarMode)
       setAutosave(settings.autosave ?? true)
       setAllSettings(settings)
       setLoaded(true)
-      await refreshAll(settings.folders)
+      await refreshAll(allWorkspaceIds)
       const gitInfo = await fileService.getWorkspaceMetadata()
       setFolderGitInfo(new Map(Object.entries(gitInfo)))
     })()
@@ -124,12 +128,27 @@ export function useWorkspace(): WorkspaceState {
     setAutosave(settings.autosave ?? true)
   }, [])
 
+  const addRepo = useCallback(async (repo: GitHubRepo) => {
+    const updated = { ...allSettings, repos: [...(allSettings.repos ?? []), repo] }
+    await fileService.saveSettings(updated)
+    setAllSettings(updated)
+    setFolders((prev) => (prev.includes(repo.id) ? prev : [...prev, repo.id]))
+    try {
+      const files = await fileService.listDirectory(repo.id)
+      setFolderFiles((prev) => new Map(prev).set(repo.id, files))
+    } catch (err) {
+      console.error('Failed to list repo directory', err)
+    }
+    const gitInfo = await fileService.getWorkspaceMetadata()
+    setFolderGitInfo(new Map(Object.entries(gitInfo)))
+  }, [allSettings, fileService])
+
   const markViewed = useCallback((filePath: string) => {
     setViewedFiles((prev) => new Set(prev).add(filePath))
   }, [])
 
   return {
     loaded, folders, sidebarMode, autosave, allSettings, folderFiles, folderGitInfo, recentFiles, viewedFiles,
-    addFolder, removeFolder, setSidebarMode, reloadSettings, markViewed
+    addFolder, removeFolder, addRepo, setSidebarMode, reloadSettings, markViewed
   }
 }

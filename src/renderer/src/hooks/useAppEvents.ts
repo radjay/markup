@@ -20,10 +20,10 @@ export function useAppEvents({ workspace, tabManager, doc, openSettings }: AppEv
   }, [tabManager])
 
   const handleSelectFile = useCallback(
-    async (path: string) => {
+    async (workspaceId: string, path: string) => {
       try {
-        const result = await fileService.readFile('', path)
-        tabManager.openFileInTab(result.filePath, result.content, false, result.sha)
+        const result = await fileService.readFile(workspaceId, path)
+        tabManager.openFileInTab(result.filePath, result.content, false, result.sha, workspaceId)
       } catch {
         window.alert(`File not found:\n${path}`)
       }
@@ -32,15 +32,15 @@ export function useAppEvents({ workspace, tabManager, doc, openSettings }: AppEv
   )
 
   const handlePinFile = useCallback(
-    async (path: string) => {
+    async (workspaceId: string, path: string) => {
       const existingIndex = tabManager.tabs.findIndex((t) => t.filePath === path)
       if (existingIndex >= 0) {
         tabManager.updateTab(existingIndex, { pinned: true })
         return
       }
       try {
-        const result = await fileService.readFile('', path)
-        tabManager.openFileInTab(result.filePath, result.content, true, result.sha)
+        const result = await fileService.readFile(workspaceId, path)
+        tabManager.openFileInTab(result.filePath, result.content, true, result.sha, workspaceId)
       } catch {
         window.alert(`File not found:\n${path}`)
       }
@@ -65,7 +65,7 @@ export function useAppEvents({ workspace, tabManager, doc, openSettings }: AppEv
     const interval = setInterval(async () => {
       const files = await window.electronAPI.pollPendingFiles()
       for (const filePath of files) {
-        handlePinFile(filePath)
+        handlePinFile('', filePath)  // Electron: no workspaceId needed
       }
     }, 500)
     return () => clearInterval(interval)

@@ -3,11 +3,11 @@ import { ChevronRight, ChevronDown, FileText } from 'lucide-react'
 import type { FileEntry } from '../../../../shared/types'
 
 interface Props {
-  folders: { path: string; files: FileEntry[] }[]
+  folders: { path: string; files: FileEntry[]; displayName?: string }[]
   gitInfo?: Map<string, { name: string; branch: string }>
   currentFile: string | null
-  onSelectFile: (path: string) => void
-  onDoubleClickFile?: (path: string) => void
+  onSelectFile: (workspaceId: string, path: string) => void
+  onDoubleClickFile?: (workspaceId: string, path: string) => void
   onRemoveFolder?: (path: string) => void
 }
 
@@ -75,6 +75,7 @@ function FileNode({
 
 function FolderRoot({
   folderPath,
+  displayName,
   files,
   branch,
   currentFile,
@@ -83,19 +84,21 @@ function FolderRoot({
   onRemoveFolder
 }: {
   folderPath: string
+  displayName?: string
   files: FileEntry[]
   branch?: string
   currentFile: string | null
-  onSelectFile: (path: string) => void
-  onDoubleClickFile?: (path: string) => void
+  onSelectFile: (workspaceId: string, path: string) => void
+  onDoubleClickFile?: (workspaceId: string, path: string) => void
   onRemoveFolder?: (path: string) => void
 }) {
   const [expanded, setExpanded] = useState(true)
-  const displayName = folderPath.split('/').slice(-2).join('/')
+  // Use explicit displayName if provided (GitHub repos), fall back to last two path segments
+  const label = displayName ?? folderPath.split('/').slice(-2).join('/')
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm(`Remove "${displayName}" from workspace?`)) {
+    if (confirm(`Remove "${label}" from workspace?`)) {
       onRemoveFolder?.(folderPath)
     }
   }
@@ -105,7 +108,7 @@ function FolderRoot({
       <div className="folder-root-row" onClick={() => setExpanded(!expanded)}>
         <span className="file-chevron">{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
         <span className="folder-root-name">
-          {displayName}
+          {label}
           {branch && <span className="folder-branch">{branch}</span>}
         </span>
         <button className="folder-remove" onClick={handleRemove} title="Remove folder">
@@ -119,8 +122,8 @@ function FolderRoot({
               key={entry.path}
               entry={entry}
               currentFile={currentFile}
-              onSelectFile={onSelectFile}
-              onDoubleClickFile={onDoubleClickFile}
+              onSelectFile={(path) => onSelectFile(folderPath, path)}
+              onDoubleClickFile={(path) => onDoubleClickFile?.(folderPath, path)}
               depth={1}
             />
           ))}
@@ -137,10 +140,11 @@ export function FileTree({ folders, gitInfo, currentFile, onSelectFile, onDouble
 
   return (
     <div className="file-tree">
-      {folders.map(({ path, files }) => (
+      {folders.map(({ path, files, displayName }) => (
         <FolderRoot
           key={path}
           folderPath={path}
+          displayName={displayName}
           files={files}
           branch={gitInfo?.get(path)?.branch}
           currentFile={currentFile}

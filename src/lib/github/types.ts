@@ -36,6 +36,8 @@ export class GitHubConflictError extends GitHubAPIError {
   }
 }
 
+// GitHubRepo is defined in src/shared/types.ts — import from there, not here
+
 export interface GitHubTreeEntry {
   path: string
   type: 'blob' | 'tree'
@@ -47,12 +49,4 @@ export interface GitHubFileContent {
   content: string
   sha: string
   encoding: string
-}
-
-export interface GitHubRepo {
-  id: string
-  owner: string
-  repo: string
-  branch: string
-  rootPath?: string
 }

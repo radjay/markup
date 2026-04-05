@@ -91,7 +91,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
     try {
       const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
       const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
-      const result = await fileService.saveFile('', activeTab.filePath, serialized, shaRef.current)
+      const result = await fileService.saveFile(activeTab.workspaceId ?? '', activeTab.filePath, serialized, shaRef.current)
       shaRef.current = result.sha
       const parsed = parseComments(serialized)
       updateActiveTab({
@@ -216,7 +216,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
 
   const reloadFile = useCallback(async () => {
     if (!activeTab) return
-    const result = await fileService.readFile('', activeTab.filePath)
+    const result = await fileService.readFile(activeTab.workspaceId ?? '', activeTab.filePath)
     shaRef.current = result.sha
     const parsed = parseComments(result.content)
     updateActiveTab({
