@@ -51,8 +51,17 @@ export interface HeadingEntry {
   id: string
 }
 
+export interface GitHubRepo {
+  id: string          // nanoid-generated stable identifier
+  owner: string       // GitHub username or org (e.g. "radjay")
+  repo: string        // repository name (e.g. "markup")
+  branch: string      // branch to read from (e.g. "main")
+  rootPath?: string   // optional subdirectory to scope the file tree (e.g. "docs/plans")
+}
+
 export interface WorkspaceSettings {
   folders: string[]
+  repos: GitHubRepo[]   // default []
   sidebarMode: 'tree' | 'recent'
   autosave: boolean
   appIcon: 'light' | 'dark'

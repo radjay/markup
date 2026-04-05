@@ -218,6 +218,7 @@ ipcMain.handle(IPC.UNWATCH_FILE, async () => true)
 
 let currentSettings: Settings = {
   folders: [],
+  repos: [],
   sidebarMode: 'recent',
   autosave: true,
   appIcon: 'light',

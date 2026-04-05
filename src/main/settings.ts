@@ -1,9 +1,11 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { readFile, writeFile } from 'fs/promises'
+import type { GitHubRepo } from '../shared/types'
 
 export interface Settings {
   folders: string[]
+  repos: GitHubRepo[]
   sidebarMode: 'tree' | 'recent'
   autosave: boolean
   appIcon: 'light' | 'dark'
@@ -17,6 +19,7 @@ const SETTINGS_PATH = join(app.getPath('userData'), 'markup-settings.json')
 
 const defaults: Settings = {
   folders: [],
+  repos: [],
   sidebarMode: 'recent',
   autosave: true,
   appIcon: 'light',
