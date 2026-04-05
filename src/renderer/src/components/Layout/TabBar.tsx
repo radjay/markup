@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PanelLeft } from 'lucide-react'
+import { PanelLeft, X } from 'lucide-react'
 import type { TabManager } from '../../hooks/useTabs'
 import type { ActiveDocumentState } from '../../hooks/useActiveDocument'
 
@@ -58,7 +58,7 @@ export function TabBar({ tabManager, doc, autosave, onShowSidebar }: Props) {
                 className="tab-close"
                 onClick={(e) => { e.stopPropagation(); closeTab(i) }}
               >
-                &times;
+                <X size={12} />
               </button>
             )}
           </div>

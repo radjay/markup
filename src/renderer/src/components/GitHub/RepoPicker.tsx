@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search, ChevronDown, X } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import type { GitHubRepo } from '../../../../shared/types'
 import type { GitHubFileService } from '../../../../lib/platform/GitHubFileService'
@@ -80,7 +80,7 @@ export function RepoPicker({ githubService, onAdd, onClose }: Props) {
           <h2 className="settings-title">
             {step === 'repo' ? 'Connect GitHub Repo' : `${selected?.owner}/${selected?.repo}`}
           </h2>
-          <button className="settings-close" onClick={onClose}>&times;</button>
+          <button className="settings-close" onClick={onClose}><X size={16} /></button>
         </div>
 
         <div className="settings-body">

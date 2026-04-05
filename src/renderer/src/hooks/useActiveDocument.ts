@@ -36,6 +36,13 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
   const pendingSaveRef = useRef(false)
   const shaRef = useRef<string | undefined>(undefined)
 
+  // Sync shaRef from the tab's sha whenever the active file changes.
+  // Without this, the first save after opening a GitHub file would pass
+  // sha=undefined to putFileContent, causing a 422 from the GitHub API.
+  useEffect(() => {
+    shaRef.current = activeTab?.sha
+  }, [activeTab?.filePath])
+
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
     const result: HeadingEntry[] = []

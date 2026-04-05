@@ -46,8 +46,12 @@ export function useWorkspace(): WorkspaceState {
 
   const refreshAll = useCallback(async (currentFolders: string[]) => {
     for (const folder of currentFolders) {
-      const files = await fileService.listDirectory(folder)
-      setFolderFiles((prev) => new Map(prev).set(folder, files))
+      try {
+        const files = await fileService.listDirectory(folder)
+        setFolderFiles((prev) => new Map(prev).set(folder, files))
+      } catch (err) {
+        console.error(`Failed to list directory for workspace ${folder}:`, err)
+      }
     }
     if (currentFolders.length > 0) {
       const recent = await fileService.listRecentFiles()
@@ -123,7 +127,9 @@ export function useWorkspace(): WorkspaceState {
 
   const reloadSettings = useCallback((settings: WorkspaceSettings) => {
     setAllSettings(settings)
-    setFolders(settings.folders)
+    // Merge both local folders and GitHub repo IDs into the workspace list
+    const repoIds = (settings.repos ?? []).map((r) => r.id)
+    setFolders([...settings.folders, ...repoIds])
     setSidebarModeState(settings.sidebarMode)
     setAutosave(settings.autosave ?? true)
   }, [])

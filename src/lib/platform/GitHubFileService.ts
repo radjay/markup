@@ -105,7 +105,10 @@ export class GitHubFileService implements FileService {
     const client = this.getClient(token)
     const filename = path.split('/').pop() || path
     const message = `Markup review: ${filename}`
-    const result = await client.putFileContent(repo.owner, repo.repo, path, content, sha!, message)
+    if (sha === undefined) {
+      throw new Error(`Cannot save ${path}: file SHA is missing. Re-open the file to refresh its SHA before saving.`)
+    }
+    const result = await client.putFileContent(repo.owner, repo.repo, path, content, sha, message)
     return { sha: result.sha }
   }
 

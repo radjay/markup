@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Eye, EyeOff, X } from 'lucide-react'
 import { SegmentedToggle } from '../ui/SegmentedToggle'
 import type { WorkspaceSettings, GitHubRepo } from '../../../../shared/types'
 
@@ -59,7 +60,7 @@ export function SettingsModal({
       <div className="settings-modal">
         <div className="settings-header">
           <h2 className="settings-title">Settings</h2>
-          <button className="settings-close" onClick={onClose}>&times;</button>
+          <button className="settings-close" onClick={onClose}><X size={16} /></button>
         </div>
 
         <div className="settings-body">
@@ -87,7 +88,7 @@ export function SettingsModal({
                     onClick={() => setShowPAT((s) => !s)}
                     title={showPAT ? 'Hide token' : 'Show token'}
                   >
-                    {showPAT ? '●' : '○'}
+                    {showPAT ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                   <button className="open-button" style={{ padding: '4px 10px', fontSize: 13 }} onClick={handlePATSave}>
                     Save
@@ -129,7 +130,7 @@ export function SettingsModal({
                             }
                           }}
                         >
-                          &times;
+                          <X size={14} />
                         </button>
                       )}
                     </div>
