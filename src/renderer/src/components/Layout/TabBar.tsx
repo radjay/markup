@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { PanelLeft } from 'lucide-react'
 import type { TabManager } from '../../hooks/useTabs'
 import type { ActiveDocumentState } from '../../hooks/useActiveDocument'
 
@@ -6,7 +7,10 @@ interface Props {
   tabManager: TabManager
   doc: ActiveDocumentState
   autosave: boolean
+  onShowSidebar?: () => void  // iOS iPhone: back-to-sidebar button
 }
+
+const isIOS = import.meta.env.MODE === 'ios'
 
 function AutosaveIndicator({ lastAutosaveAt }: { lastAutosaveAt: number | null }) {
   const [visible, setVisible] = useState(false)
@@ -25,13 +29,19 @@ function AutosaveIndicator({ lastAutosaveAt }: { lastAutosaveAt: number | null }
   )
 }
 
-export function TabBar({ tabManager, doc, autosave }: Props) {
+export function TabBar({ tabManager, doc, autosave, onShowSidebar }: Props) {
   const { tabs, activeTabIndex, activeTab, clickTab, closeTab } = tabManager
 
   if (tabs.length === 0) return null
 
   return (
     <div className="tab-bar">
+      {/* iOS iPhone: button to open the sidebar drawer */}
+      {isIOS && onShowSidebar && (
+        <button className="ios-sidebar-btn" onClick={onShowSidebar} title="Open sidebar">
+          <PanelLeft size={16} />
+        </button>
+      )}
       <div className="tab-list">
         {tabs.map((tab, i) => (
           <div

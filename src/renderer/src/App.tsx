@@ -78,6 +78,16 @@ interface AppInnerProps {
   onCloseRepoPicker?: () => void
 }
 
+// iPhone: the sidebar is a full-screen drawer that slides in from the left.
+// We track its open state here so both the sidebar button and TabBar back
+// button can control it. On iPad (≥768px) the sidebar is always visible.
+const useIOSSidebar = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(!isIOS)
+  const openSidebar = useCallback(() => setSidebarOpen(true), [])
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+  return { sidebarOpen, openSidebar, closeSidebar }
+}
+
 function AppInner({
   pat, onPATChange, showRepoPicker, onOpenRepoPicker, onCloseRepoPicker
 }: AppInnerProps) {
@@ -86,6 +96,7 @@ function AppInner({
   const tabManager = useTabs(workspace.markViewed, workspace.allSettings.defaultMode)
   const doc = useActiveDocument(tabManager, workspace.autosave, workspace.allSettings.authorName)
   const [showSettings, setShowSettings] = useState(false)
+  const { sidebarOpen, openSidebar, closeSidebar } = useIOSSidebar()
 
   const toggleSettings = useCallback(() => setShowSettings((s) => !s), [])
 
@@ -163,31 +174,42 @@ function AppInner({
   }))
 
   return (
-    <div className="app" style={{ '--editor-font-size': `${workspace.allSettings.fontSize}px` } as React.CSSProperties}>
-      <div className="titlebar-drag">
-        <div className="titlebar-actions">
-          {tabManager.activeTab && (
-            <button
-              className={`titlebar-settings-btn ${workspace.allSettings.rightPanelOpen ? 'active' : ''}`}
-              onClick={() => handleSettingChange('rightPanelOpen', !workspace.allSettings.rightPanelOpen)}
-              title="Toggle right panel"
-            >
-              <PanelRight size={15} />
+    <div
+      className={`app${isIOS ? ' ios-app' : ''}`}
+      style={{ '--editor-font-size': `${workspace.allSettings.fontSize}px` } as React.CSSProperties}
+    >
+      {/* iOS: overlay to close sidebar drawer when tapping outside */}
+      {isIOS && sidebarOpen && (
+        <div className="ios-sidebar-overlay" onClick={closeSidebar} />
+      )}
+
+      {!isIOS && (
+        <div className="titlebar-drag">
+          <div className="titlebar-actions">
+            {tabManager.activeTab && (
+              <button
+                className={`titlebar-settings-btn ${workspace.allSettings.rightPanelOpen ? 'active' : ''}`}
+                onClick={() => handleSettingChange('rightPanelOpen', !workspace.allSettings.rightPanelOpen)}
+                title="Toggle right panel"
+              >
+                <PanelRight size={15} />
+              </button>
+            )}
+            <button className="titlebar-settings-btn" onClick={toggleSettings} title="Settings (Cmd+,)">
+              <SettingsIcon size={15} />
             </button>
-          )}
-          <button className="titlebar-settings-btn" onClick={toggleSettings} title="Settings (Cmd+,)">
-            <SettingsIcon size={15} />
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="main-content">
-        <aside className="sidebar">
+        <aside className={`sidebar${isIOS ? (sidebarOpen ? ' ios-sidebar-open' : ' ios-sidebar-closed') : ''}`}>
           <SidebarHeader
             mode={workspace.sidebarMode}
             onModeChange={workspace.setSidebarMode}
             onAddFolder={workspace.addFolder}
             onAddRepo={onOpenRepoPicker}
+            onClose={isIOS ? closeSidebar : undefined}
           />
           <div className="sidebar-content">
             {workspace.sidebarMode === 'tree' ? (
@@ -212,7 +234,7 @@ function AppInner({
         </aside>
 
         <div className="editor-area">
-          <TabBar tabManager={tabManager} doc={doc} autosave={workspace.autosave} />
+          <TabBar tabManager={tabManager} doc={doc} autosave={workspace.autosave} onShowSidebar={isIOS ? openSidebar : undefined} />
           {doc.showExternalChangeBar && (
             <ExternalChangeBar
               hasUnsavedChanges={tabManager.activeTab?.hasUnsavedChanges ?? false}
