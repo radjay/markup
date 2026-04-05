@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { parseComments } from '../lib/markdown/comments'
 import type { InlineComment, DocumentComment } from '../../../shared/types'
+import { useFileService } from '../../../lib/platform/FileServiceContext'
 
 export type EditorMode = 'review' | 'edit'
 
@@ -16,9 +17,10 @@ export interface Tab {
   mode: EditorMode
   pinned: boolean
   scrollTop: number
+  sha?: string
 }
 
-function parseFileIntoTab(filePath: string, content: string, pinned: boolean, defaultMode: EditorMode = 'review'): Tab {
+function parseFileIntoTab(filePath: string, content: string, pinned: boolean, defaultMode: EditorMode = 'review', sha?: string): Tab {
   const fileName = filePath.split('/').pop() || filePath
   let cleanContent = content
   let inlineComments: InlineComment[] = []
@@ -35,7 +37,7 @@ function parseFileIntoTab(filePath: string, content: string, pinned: boolean, de
 
   return {
     filePath, fileName, rawContent: content, cleanContent, editContent: cleanContent,
-    inlineComments, documentComments, hasUnsavedChanges: false, mode: defaultMode, pinned, scrollTop: 0
+    inlineComments, documentComments, hasUnsavedChanges: false, mode: defaultMode, pinned, scrollTop: 0, sha
   }
 }
 
@@ -43,7 +45,7 @@ export interface TabManager {
   tabs: Tab[]
   activeTabIndex: number
   activeTab: Tab | null
-  openFileInTab: (filePath: string, content: string, pinned: boolean) => void
+  openFileInTab: (filePath: string, content: string, pinned: boolean, sha?: string) => void
   closeTab: (index: number) => void
   clickTab: (index: number) => void
   updateTab: (index: number, updates: Partial<Tab>) => void
@@ -51,6 +53,7 @@ export interface TabManager {
 }
 
 export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: EditorMode = 'review'): TabManager {
+  const fileService = useFileService()
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabIndex, setActiveTabIndex] = useState<number>(-1)
 
@@ -82,7 +85,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
   )
 
   const openFileInTab = useCallback(
-    (filePath: string, content: string, pinned: boolean) => {
+    (filePath: string, content: string, pinned: boolean, sha?: string) => {
       const existingIndex = tabs.findIndex((t) => t.filePath === filePath)
       if (existingIndex >= 0) {
         setActiveTabIndex(existingIndex)
@@ -91,16 +94,16 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
         return
       }
 
-      const newTab = parseFileIntoTab(filePath, content, pinned, defaultMode)
+      const newTab = parseFileIntoTab(filePath, content, pinned, defaultMode, sha)
 
       if (!pinned) {
         const previewIndex = tabs.findIndex((t) => !t.pinned)
         if (previewIndex >= 0) {
           if (!confirmDiscardChanges(tabs[previewIndex])) return
-          window.electronAPI.unwatchFile(tabs[previewIndex].filePath)
+          fileService.unwatchFile(tabs[previewIndex].filePath)
           setTabs((prev) => prev.map((t, i) => (i === previewIndex ? newTab : t)))
           setActiveTabIndex(previewIndex)
-          window.electronAPI.watchFile(filePath)
+          fileService.watchFile(filePath)
           onFileViewed?.(filePath)
           return
         }
@@ -108,17 +111,17 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
 
       setTabs((prev) => [...prev, newTab])
       setActiveTabIndex(tabs.length)
-      window.electronAPI.watchFile(filePath)
+      fileService.watchFile(filePath)
       onFileViewed?.(filePath)
     },
-    [tabs, updateTab, onFileViewed, confirmDiscardChanges, defaultMode]
+    [tabs, updateTab, onFileViewed, confirmDiscardChanges, defaultMode, fileService]
   )
 
   const closeTab = useCallback(
     (index: number) => {
       const tab = tabs[index]
       if (!confirmDiscardChanges(tab)) return
-      window.electronAPI.unwatchFile(tab.filePath)
+      fileService.unwatchFile(tab.filePath)
       setTabs((prev) => prev.filter((_, i) => i !== index))
       if (index === activeTabIndex) {
         if (tabs.length <= 1) setActiveTabIndex(-1)
@@ -128,7 +131,7 @@ export function useTabs(onFileViewed?: (filePath: string) => void, defaultMode: 
         setActiveTabIndex((prev) => prev - 1)
       }
     },
-    [tabs, activeTabIndex, confirmDiscardChanges]
+    [tabs, activeTabIndex, confirmDiscardChanges, fileService]
   )
 
   const clickTab = useCallback(

@@ -2,14 +2,18 @@ import { useEffect, useCallback } from 'react'
 import type { WorkspaceState } from './useWorkspace'
 import type { TabManager } from './useTabs'
 import type { ActiveDocumentState } from './useActiveDocument'
+import { useFileService } from '../../../lib/platform/FileServiceContext'
 
 interface AppEventDeps {
   workspace: WorkspaceState
   tabManager: TabManager
   doc: ActiveDocumentState
+  openSettings?: () => void
 }
 
-export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
+export function useAppEvents({ workspace, tabManager, doc, openSettings }: AppEventDeps) {
+  const fileService = useFileService()
+
   const handleOpen = useCallback(async () => {
     const result = await window.electronAPI.openFile()
     if (result) tabManager.openFileInTab(result.filePath, result.content, true)
@@ -18,13 +22,13 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
   const handleSelectFile = useCallback(
     async (path: string) => {
       try {
-        const result = await window.electronAPI.readFile(path)
-        tabManager.openFileInTab(result.filePath, result.content, false)
+        const result = await fileService.readFile('', path)
+        tabManager.openFileInTab(result.filePath, result.content, false, result.sha)
       } catch {
         window.alert(`File not found:\n${path}`)
       }
     },
-    [tabManager]
+    [tabManager, fileService]
   )
 
   const handlePinFile = useCallback(
@@ -35,25 +39,26 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
         return
       }
       try {
-        const result = await window.electronAPI.readFile(path)
-        tabManager.openFileInTab(result.filePath, result.content, true)
+        const result = await fileService.readFile('', path)
+        tabManager.openFileInTab(result.filePath, result.content, true, result.sha)
       } catch {
         window.alert(`File not found:\n${path}`)
       }
     },
-    [tabManager]
+    [tabManager, fileService]
   )
 
-  // Menu events
+  // Menu events (Electron-only)
   useEffect(() => {
     const cleanups = [
       window.electronAPI.onMenuOpenFile(() => handleOpen()),
       window.electronAPI.onMenuAddFolder(() => workspace.addFolder()),
       window.electronAPI.onMenuSave(() => doc.save()),
-      window.electronAPI.onMenuToggleMode(() => doc.modeToggle())
+      window.electronAPI.onMenuToggleMode(() => doc.modeToggle()),
+      ...(openSettings ? [window.electronAPI.onMenuOpenSettings(openSettings)] : [])
     ]
     return () => cleanups.forEach((c) => c())
-  }, [handleOpen, workspace, doc])
+  }, [handleOpen, workspace, doc, openSettings])
 
   // Poll for files opened via CLI / open-file event
   useEffect(() => {
@@ -81,9 +86,9 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
         tabManager.openFileInTab(result.filePath, result.content, true)
       } else if (result.type === 'directory') {
         // Dropped folder acts as "Add Folder"
-        await window.electronAPI.saveSettings({
-          folders: [...workspace.folders, result.dirPath],
-          sidebarMode: workspace.sidebarMode
+        await fileService.saveSettings({
+          ...workspace.allSettings,
+          folders: [...workspace.folders, result.dirPath]
         })
         // Trigger a reload by calling addFolder logic
         window.location.reload() // simplest for now
@@ -95,7 +100,7 @@ export function useAppEvents({ workspace, tabManager, doc }: AppEventDeps) {
       document.removeEventListener('dragover', handleDragOver)
       document.removeEventListener('drop', handleDrop)
     }
-  }, [tabManager, workspace])
+  }, [tabManager, workspace, fileService])
 
   // Keyboard shortcuts
   useEffect(() => {

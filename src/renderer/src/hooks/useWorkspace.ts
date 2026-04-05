@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { FileEntry, WatchedFile, WorkspaceSettings } from '../../../shared/types'
+import { useFileService } from '../../../lib/platform/FileServiceContext'
 
 export type SidebarMode = 'tree' | 'recent'
 
@@ -21,6 +22,7 @@ export interface WorkspaceState {
 }
 
 export function useWorkspace(): WorkspaceState {
+  const fileService = useFileService()
   const [loaded, setLoaded] = useState(false)
   const [folders, setFolders] = useState<string[]>([])
   const [sidebarMode, setSidebarModeState] = useState<SidebarMode>('recent')
@@ -31,6 +33,7 @@ export function useWorkspace(): WorkspaceState {
   const [folderGitInfo, setFolderGitInfo] = useState<Map<string, { name: string; branch: string }>>(new Map())
   const [allSettings, setAllSettings] = useState<WorkspaceSettings>({
     folders: [],
+    repos: [],
     sidebarMode: 'recent',
     autosave: true,
     appIcon: 'light',
@@ -42,75 +45,76 @@ export function useWorkspace(): WorkspaceState {
 
   const refreshAll = useCallback(async (currentFolders: string[]) => {
     for (const folder of currentFolders) {
-      const files = await window.electronAPI.listDirectory(folder)
+      const files = await fileService.listDirectory(folder)
       setFolderFiles((prev) => new Map(prev).set(folder, files))
     }
     if (currentFolders.length > 0) {
-      const recent = await window.electronAPI.listRecentFiles()
+      const recent = await fileService.listRecentFiles()
       setRecentFiles(recent)
     }
-  }, [])
+  }, [fileService])
 
   // Load settings on startup
   useEffect(() => {
     (async () => {
-      const settings = await window.electronAPI.loadSettings()
+      const settings = await fileService.loadSettings()
       setFolders(settings.folders)
       setSidebarModeState(settings.sidebarMode)
       setAutosave(settings.autosave ?? true)
       setAllSettings(settings)
       setLoaded(true)
       await refreshAll(settings.folders)
-      const gitInfo = await window.electronAPI.getGitInfo()
+      const gitInfo = await fileService.getWorkspaceMetadata()
       setFolderGitInfo(new Map(Object.entries(gitInfo)))
     })()
-  }, [refreshAll])
+  }, [refreshAll, fileService])
 
   // Listen for chokidar events
   useEffect(() => {
     const refresh = () => refreshAll(folders)
     const cleanups = [
-      window.electronAPI.onFileAdded(refresh),
-      window.electronAPI.onFileRemoved(refresh)
+      fileService.onFileAdded(refresh),
+      fileService.onFileRemoved(refresh)
     ]
     return () => cleanups.forEach((c) => c())
-  }, [folders, refreshAll])
+  }, [folders, refreshAll, fileService])
 
   const addFolder = useCallback(async () => {
-    const folder = await window.electronAPI.addFolder()
-    if (folder) {
+    const workspace = await fileService.addWorkspace()
+    if (workspace) {
+      const folder = workspace.path ?? workspace.id
       setFolders((prev) => (prev.includes(folder) ? prev : [...prev, folder]))
-      const files = await window.electronAPI.listDirectory(folder)
+      const files = await fileService.listDirectory(folder)
       setFolderFiles((prev) => new Map(prev).set(folder, files))
-      const recent = await window.electronAPI.listRecentFiles()
+      const recent = await fileService.listRecentFiles()
       setRecentFiles(recent)
     }
-  }, [])
+  }, [fileService])
 
   const removeFolder = useCallback(async (folder: string) => {
-    await window.electronAPI.removeFolder(folder)
+    await fileService.removeWorkspace(folder)
     setFolders((prev) => prev.filter((f) => f !== folder))
     setFolderFiles((prev) => {
       const next = new Map(prev)
       next.delete(folder)
       return next
     })
-    const recent = await window.electronAPI.listRecentFiles()
+    const recent = await fileService.listRecentFiles()
     setRecentFiles(recent)
-  }, [])
+  }, [fileService])
 
   const setSidebarMode = useCallback(
     async (mode: SidebarMode) => {
       setSidebarModeState(mode)
       const updated = { ...allSettings, folders, sidebarMode: mode, autosave }
       setAllSettings(updated)
-      await window.electronAPI.saveSettings(updated)
+      await fileService.saveSettings(updated)
       if (mode === 'recent') {
-        const recent = await window.electronAPI.listRecentFiles()
+        const recent = await fileService.listRecentFiles()
         setRecentFiles(recent)
       }
     },
-    [folders, autosave, allSettings]
+    [folders, autosave, allSettings, fileService]
   )
 
   const reloadSettings = useCallback((settings: WorkspaceSettings) => {

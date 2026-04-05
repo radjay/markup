@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { parseComments, serializeComments, createInlineComment, createDocumentComment } from '../lib/markdown/comments'
 import type { HeadingEntry } from '../../../shared/types'
 import type { TabManager } from './useTabs'
+import { useFileService } from '../../../lib/platform/FileServiceContext'
 
 export interface ActiveDocumentState {
   headings: HeadingEntry[]
@@ -24,10 +25,16 @@ export interface ActiveDocumentState {
 }
 
 export function useActiveDocument(tabManager: TabManager, autosave = true, authorName = ''): ActiveDocumentState {
+  const fileService = useFileService()
   const { activeTab, updateActiveTab } = tabManager
   const [showExternalChangeBar, setShowExternalChangeBar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null)
+
+  // Save serialization refs
+  const isSavingRef = useRef(false)
+  const pendingSaveRef = useRef(false)
+  const shaRef = useRef<string | undefined>(undefined)
 
   const headings = useMemo<HeadingEntry[]>(() => {
     if (!activeTab?.cleanContent) return []
@@ -57,7 +64,7 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
 
   // Listen for external file changes
   useEffect(() => {
-    const cleanup = window.electronAPI.onFileChanged((changedPath: string) => {
+    const cleanup = fileService.onFileChanged((changedPath: string) => {
       if (activeTab && changedPath === activeTab.filePath) {
         // Suppress if file was just opened (within 2s)
         const opened = openedAtRef.current
@@ -68,26 +75,45 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
       }
     })
     return cleanup
-  }, [activeTab])
+  }, [activeTab, fileService])
 
   const save = useCallback(async () => {
     if (!activeTab) return
+
+    // Serialize saves: if a save is already in flight, queue one more
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true
+      return
+    }
+
+    isSavingRef.current = true
     setSaveError(null)
     try {
       const baseContent = activeTab.mode === 'edit' ? activeTab.editContent : activeTab.rawContent
       const serialized = serializeComments(baseContent, activeTab.inlineComments, activeTab.documentComments)
-      await window.electronAPI.saveFile(activeTab.filePath, serialized)
+      const result = await fileService.saveFile('', activeTab.filePath, serialized, shaRef.current)
+      shaRef.current = result.sha
       const parsed = parseComments(serialized)
       updateActiveTab({
         rawContent: serialized, cleanContent: parsed.content, editContent: parsed.content,
         hasUnsavedChanges: false, pinned: true
       })
       if (autosave) setLastAutosaveAt(Date.now())
+
+      // If another save was requested while we were saving, run it now
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false
+        // Schedule async so we don't recurse
+        setTimeout(() => saveRef.current(), 0)
+      }
     } catch (err) {
+      pendingSaveRef.current = false
       const msg = err instanceof Error ? err.message : 'Save failed'
       setSaveError(msg)
+    } finally {
+      isSavingRef.current = false
     }
-  }, [activeTab, updateActiveTab])
+  }, [activeTab, updateActiveTab, autosave, fileService])
 
   // Autosave: trigger save shortly after comment mutations
   const [autosavePending, setAutosavePending] = useState(0)
@@ -190,14 +216,15 @@ export function useActiveDocument(tabManager: TabManager, autosave = true, autho
 
   const reloadFile = useCallback(async () => {
     if (!activeTab) return
-    const result = await window.electronAPI.readFile(activeTab.filePath)
+    const result = await fileService.readFile('', activeTab.filePath)
+    shaRef.current = result.sha
     const parsed = parseComments(result.content)
     updateActiveTab({
       rawContent: result.content, cleanContent: parsed.content, editContent: parsed.content,
       inlineComments: parsed.inlineComments, documentComments: parsed.documentComments, hasUnsavedChanges: false
     })
     setShowExternalChangeBar(false)
-  }, [activeTab, updateActiveTab])
+  }, [activeTab, updateActiveTab, fileService])
 
   const scrollToHeading = useCallback((id: string) => {
     if (activeTab?.mode === 'edit') {

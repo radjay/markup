@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Settings as SettingsIcon, PanelRight } from 'lucide-react'
 import { useWorkspace } from './hooks/useWorkspace'
 import { useTabs } from './hooks/useTabs'
 import { useActiveDocument } from './hooks/useActiveDocument'
 import { useAppEvents } from './hooks/useAppEvents'
+import { useIOSAppEvents } from './hooks/useIOSAppEvents'
 import { WelcomeScreen } from './components/Layout/WelcomeScreen'
 import { TabBar } from './components/Layout/TabBar'
 import { ExternalChangeBar } from './components/Layout/ExternalChangeBar'
@@ -14,6 +15,9 @@ import { RecentFiles } from './components/Sidebar/RecentFiles'
 import { SidebarHeader } from './components/Sidebar/SidebarHeader'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { SegmentedToggle } from './components/ui/SegmentedToggle'
+import { ElectronFileService } from '../../lib/platform/ElectronFileService'
+import { FileServiceProvider } from '../../lib/platform/FileServiceContext'
+import { useFileService } from '../../lib/platform/FileServiceContext'
 import type { WorkspaceSettings } from '../../shared/types'
 
 const modeOptions = [
@@ -21,32 +25,42 @@ const modeOptions = [
   { value: 'edit', label: 'Edit' }
 ]
 
-export default function App() {
+const isIOS = import.meta.env.MODE === 'ios'
+
+// Singleton so we don't recreate on each render
+const electronFileService = isIOS ? null : new ElectronFileService()
+
+function AppInner() {
+  const fileService = useFileService()
   const workspace = useWorkspace()
   const tabManager = useTabs(workspace.markViewed, workspace.allSettings.defaultMode)
   const doc = useActiveDocument(tabManager, workspace.autosave, workspace.allSettings.authorName)
-  const events = useAppEvents({ workspace, tabManager, doc })
   const [showSettings, setShowSettings] = useState(false)
 
   const toggleSettings = useCallback(() => setShowSettings((s) => !s), [])
 
-  // Listen for menu:openSettings (Cmd+,)
-  useEffect(() => {
-    return window.electronAPI.onMenuOpenSettings(toggleSettings)
-  }, [toggleSettings])
+  const eventsElectron = useAppEvents(
+    isIOS
+      ? { workspace, tabManager, doc, openSettings: toggleSettings }
+      : { workspace, tabManager, doc, openSettings: toggleSettings }
+  )
+  const eventsIOS = useIOSAppEvents({ workspace, tabManager, doc })
+
+  // Select the right event handlers based on platform
+  const events = isIOS ? eventsIOS : eventsElectron
 
   const handleSettingChange = useCallback(
     async <K extends keyof WorkspaceSettings>(key: K, value: WorkspaceSettings[K]) => {
       const updated = { ...workspace.allSettings, [key]: value }
-      await window.electronAPI.saveSettings(updated)
+      await fileService.saveSettings(updated)
       workspace.reloadSettings(updated)
 
-      // Apply icon change immediately
-      if (key === 'appIcon') {
+      // Apply icon change immediately — desktop only
+      if (key === 'appIcon' && import.meta.env.MODE !== 'ios') {
         await window.electronAPI.setAppIcon(value as 'light' | 'dark')
       }
     },
-    [workspace]
+    [workspace, fileService]
   )
 
   if (!workspace.loaded) return null
@@ -166,5 +180,19 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  if (isIOS) {
+    // iOS provider — will be swapped for a real implementation in Unit 3
+    // For now render nothing meaningful (iOS file service not yet wired)
+    return null
+  }
+
+  return (
+    <FileServiceProvider value={electronFileService!}>
+      <AppInner />
+    </FileServiceProvider>
   )
 }
