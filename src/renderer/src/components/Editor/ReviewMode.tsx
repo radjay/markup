@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, type ReactNode } from 'react'
+import { useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -28,7 +28,7 @@ function extractText(children: ReactNode): string {
   return ''
 }
 
-interface EditDraft {
+export interface EditDraft {
   id: string
   text: string
 }
@@ -36,9 +36,11 @@ interface EditDraft {
 export function ReviewMode({ content, inlineComments, onAddComment, onEditComment, onDeleteComment }: Props) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null)
 
-  // Lifted draft state: keyed by anchor
-  const [draftTexts, setDraftTexts] = useState<Record<string, string>>({})
-  const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
+  // Draft state stored in refs — updates don't trigger re-renders.
+  // InlineComment manages its own local display state for typing,
+  // and syncs to these refs so drafts survive unmount/remount.
+  const draftTextsRef = useRef<Record<string, string>>({})
+  const editDraftsRef = useRef<Record<string, EditDraft>>({})
 
   const handleBlockClick = useCallback((anchor: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -49,12 +51,7 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
     (body: string) => {
       if (activeAnchor) {
         onAddComment(activeAnchor, body)
-        // Clear draft after submit
-        setDraftTexts((prev) => {
-          const next = { ...prev }
-          delete next[activeAnchor]
-          return next
-        })
+        delete draftTextsRef.current[activeAnchor]
       }
     },
     [activeAnchor, onAddComment]
@@ -62,58 +59,39 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
 
   const handleClose = useCallback(() => {
     if (activeAnchor) {
-      // Clear draft on close
-      setDraftTexts((prev) => {
-        const next = { ...prev }
-        delete next[activeAnchor]
-        return next
-      })
-      setEditDrafts((prev) => {
-        const next = { ...prev }
-        delete next[activeAnchor]
-        return next
-      })
+      delete draftTextsRef.current[activeAnchor]
+      delete editDraftsRef.current[activeAnchor]
     }
     setActiveAnchor(null)
   }, [activeAnchor])
 
+  // Ref-based callbacks — no state updates, no re-renders
   const handleDraftChange = useCallback((anchor: string, text: string) => {
-    setDraftTexts((prev) => ({ ...prev, [anchor]: text }))
+    draftTextsRef.current[anchor] = text
   }, [])
 
   const handleEditStart = useCallback((anchor: string, id: string, text: string) => {
-    setEditDrafts((prev) => ({ ...prev, [anchor]: { id, text } }))
+    editDraftsRef.current[anchor] = { id, text }
   }, [])
 
   const handleEditChange = useCallback((anchor: string, text: string) => {
-    setEditDrafts((prev) => {
-      const existing = prev[anchor]
-      if (!existing) return prev
-      return { ...prev, [anchor]: { ...existing, text } }
-    })
+    const existing = editDraftsRef.current[anchor]
+    if (existing) editDraftsRef.current[anchor] = { ...existing, text }
   }, [])
 
   const handleEditSave = useCallback(
     (anchor: string) => {
-      const draft = editDrafts[anchor]
+      const draft = editDraftsRef.current[anchor]
       if (draft && draft.text.trim()) {
         onEditComment(draft.id, draft.text.trim())
-        setEditDrafts((prev) => {
-          const next = { ...prev }
-          delete next[anchor]
-          return next
-        })
+        delete editDraftsRef.current[anchor]
       }
     },
-    [editDrafts, onEditComment]
+    [onEditComment]
   )
 
   const handleEditCancel = useCallback((anchor: string) => {
-    setEditDrafts((prev) => {
-      const next = { ...prev }
-      delete next[anchor]
-      return next
-    })
+    delete editDraftsRef.current[anchor]
   }, [])
 
   const getCommentsForAnchor = useCallback(
@@ -125,7 +103,6 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
   const commentCountMap = useMemo(() => {
     const map = new Map<string, number>()
     let counter = 0
-    // Collect unique anchors in order they appear
     const anchors: string[] = []
     inlineComments.forEach((c) => {
       if (anchors.indexOf(c.anchor) === -1) {
@@ -140,7 +117,7 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
     return map
   }, [inlineComments])
 
-  // Memoized render function for commentable blocks
+  // Stable render function — no draft state in dependencies
   const renderBlock = useCallback(
     (anchor: string, children: ReactNode) => {
       const comments = getCommentsForAnchor(anchor)
@@ -161,9 +138,9 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
             <InlineComment
               anchor={anchor}
               comments={comments}
-              draftText={draftTexts[anchor] ?? ''}
+              initialDraftText={draftTextsRef.current[anchor] ?? ''}
               onDraftChange={(text) => handleDraftChange(anchor, text)}
-              editDraft={editDrafts[anchor] ?? null}
+              initialEditDraft={editDraftsRef.current[anchor] ?? null}
               onEditStart={(id, text) => handleEditStart(anchor, id, text)}
               onEditChange={(text) => handleEditChange(anchor, text)}
               onEditSave={() => handleEditSave(anchor)}
@@ -177,7 +154,7 @@ export function ReviewMode({ content, inlineComments, onAddComment, onEditCommen
       )
     },
     [
-      activeAnchor, commentCountMap, draftTexts, editDrafts,
+      activeAnchor, commentCountMap,
       getCommentsForAnchor, handleBlockClick, handleSubmitComment, handleClose,
       handleDraftChange, handleEditStart, handleEditChange, handleEditSave, handleEditCancel,
       onDeleteComment
