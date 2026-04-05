@@ -6,3 +6,8 @@ release/
 .env.*
 *.log
 .DS_Store
+
+# iOS signing artifacts — never commit
+ios/App/App/*.p12
+ios/App/App/*.mobileprovision
+ios/*.xcworkspace/xcuserdata
