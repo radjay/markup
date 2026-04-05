@@ -13,6 +13,7 @@ Electron-based native markdown editor for reviewing AI-generated plans and docum
 ## Tech Stack
 
 - Electron (desktop app)
+- Capacitor + iOS (mobile app — wraps the same React renderer in WKWebView)
 - TypeScript
 
 ## Conventions
@@ -24,12 +25,34 @@ Electron-based native markdown editor for reviewing AI-generated plans and docum
 - Main process: Electron shell, file I/O, window management
 - Renderer process: Markdown rendering, editing UI, comment system
 - Preload: Bridge between main and renderer
+- `FileService` interface (`src/lib/platform/`) decouples the renderer from Electron IPC.
+  `ElectronFileService` wraps `window.electronAPI`; `GitHubFileService` wraps the GitHub REST API for iOS.
+- `import.meta.env.MODE === 'ios'` guards tree-shake Electron code from the iOS bundle.
+
+## Dual build setup
+
+Two build configs exist side-by-side — do not merge them:
+
+| Command | Config | Output | Platform |
+|---------|--------|--------|----------|
+| `npm run build` | `electron.vite.config.ts` | `out/` | Electron (macOS) |
+| `npm run build:ios` | `vite.config.capacitor.ts` | `dist/ios/` | iOS (Capacitor) |
+
+`electron-vite` cannot produce a standalone renderer bundle for Capacitor (it unconditionally builds three Electron bundles). The iOS build uses plain Vite directly.
 
 ## Development
 
+**Electron (desktop):**
 - `npm run dev` — run in development mode
 - `npm run build` — build for production
 - `npm run dist` — package as macOS DMG
+
+**iOS (Capacitor):**
+- `npm run build:ios` — build standalone renderer bundle for iOS
+- `npm run cap:sync` — sync built assets into the Xcode project
+- `npm run cap:open` — open in Xcode
+- `npm run cap:run` — run on simulator/device
+- See `docs/ios-build.md` for full build and App Store submission guide
 
 ## Markup Comments
 

@@ -15,6 +15,7 @@
     "dist:dir": "npm run build && electron-builder --mac --dir",
     "install-app": "osascript -e 'tell application \"Markup\" to quit' 2>/dev/null; sleep 2; rm -rf release/ out/ /Applications/Markup.app && npm run dist:dir && cp -R release/mac-arm64/Markup.app /Applications/Markup.app && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Markup.app && xattr -cr /Applications/Markup.app && echo 'Installed to /Applications/Markup.app'",
     "build:ios": "vite build --config vite.config.capacitor.ts --mode ios",
+    "dist:ios": "npm run build:ios && npm run cap:sync && xcodebuild archive -workspace ios/App/App.xcworkspace -scheme App -destination 'generic/platform=iOS' -archivePath build/Markup.xcarchive",
     "cap:sync": "cap sync ios",
     "cap:run": "cap run ios",
     "cap:open": "cap open ios",

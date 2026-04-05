@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for Markup iOS app.
+  After running `cap add ios`, copy this file to:
+    ios/App/App/Markup.entitlements
+  and set it as the Code Signing Entitlements in Build Settings.
+-->
+<plist version="1.0">
+<dict>
+  <!-- Keychain access group used by @capacitor/preferences -->
+  <key>keychain-access-groups</key>
+  <array>
+    <string>$(AppIdentifierPrefix)com.markup.app.ios</string>
+  </array>
+</dict>
+</plist>
